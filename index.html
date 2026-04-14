@@ -392,6 +392,50 @@ body{background:#0a1628;font-family:var(--ff);font-size:14px;}
 }
 .sbox.empty{background:#fff;border-style:dashed;color:#ccc;font-size:11px;}
 
+/* DẤU THANH — ô chọn dấu trực quan cho bé */
+.dau-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;
+  width:62px;height:70px;
+  border-radius:14px;
+  background:#fff;
+  border:2.5px solid var(--ice2);
+  cursor:pointer;
+  transition:all .15s;
+  padding:6px 4px;
+}
+.dau-btn:hover{border-color:var(--ice3);background:var(--ice1);}
+.dau-btn.on{
+  background:var(--ice4);
+  border-color:var(--ice4);
+  box-shadow:0 0 0 3px rgba(74,144,217,.25);
+}
+.dau-chu{
+  font-size:28px;font-weight:800;
+  color:var(--ice5);
+  line-height:1;
+  font-family:'Quicksand',sans-serif;
+  transition:color .15s;
+}
+.dau-btn.on .dau-chu{color:#fff;}
+.dau-ten{
+  font-size:9px;font-weight:700;
+  color:var(--ice4);
+  font-family:var(--ffs);
+  text-align:center;
+  line-height:1.2;
+  transition:color .15s;
+}
+.dau-btn.on .dau-ten{color:rgba(255,255,255,.85);}
+/* Màu sắc phân biệt từng dấu */
+.dau-btn:nth-child(1) .dau-chu{color:#888;}
+.dau-btn:nth-child(1).on .dau-chu{color:#fff;}
+.dau-btn:nth-child(2) .dau-chu{color:#2C6FAC;}
+.dau-btn:nth-child(3) .dau-chu{color:#C23878;}
+.dau-btn:nth-child(4) .dau-chu{color:#3B6D11;}
+.dau-btn:nth-child(5) .dau-chu{color:#854F0B;}
+.dau-btn:nth-child(6) .dau-chu{color:#A32D2D;}
+
 /* ANSWER BUTTONS */
 .ans-b{
   width:52px;height:52px;border-radius:12px;background:var(--ice1);
@@ -679,7 +723,7 @@ canvas{display:block;touch-action:none;}
       </div>
       <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;" id="van-boxes"></div>
       <div style="font-size:11px;color:var(--ice5);text-align:center;margin-bottom:8px;font-family:var(--ffs);">Bấm chọn dấu thanh đúng:</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;" id="van-tones"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;" id="van-tones"></div>
       <div class="msg" id="van-msg"></div>
       <div class="btn-row"><button class="btn-g" onclick="vanMoi()">Vần khác →</button></div>
     </div>
@@ -942,15 +986,35 @@ canvas{display:block;touch-action:none;}
 <!-- ═══ TỪ VỰNG ═══ -->
 <div id="s-tu" class="scr">
   <div class="stab-row" id="tabs-tu"></div>
+
+  <!-- Flash card từ vựng -->
   <div class="vn-flash">
-    <span style="font-size:52px;display:block;margin-bottom:8px;" id="vn-e">🐘</span>
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
-      <div style="font-size:22px;font-weight:700;color:var(--ice5);font-family:var(--ffs);" id="vn-t">Con voi</div>
-      <button class="snd" onclick="docTuVung()">🔊</button>
+    <!-- Emoji to -->
+    <span style="font-size:58px;display:block;margin-bottom:8px;" id="vn-e">🐘</span>
+
+    <!-- Tên TIẾNG ANH — to, nổi bật -->
+    <div style="font-size:28px;font-weight:800;color:var(--ice5);font-family:'Quicksand',sans-serif;letter-spacing:.03em;margin-bottom:4px;" id="vn-en">Elephant</div>
+
+    <!-- Nghĩa TIẾNG VIỆT — nhỏ hơn, mờ hơn -->
+    <div style="font-size:14px;color:var(--ice4);margin-bottom:10px;font-family:var(--ffs);" id="vn-t">Con voi</div>
+
+    <!-- 2 nút đọc riêng -->
+    <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-bottom:8px;">
+      <button onclick="docTuVungEn()" style="display:flex;align-items:center;gap:5px;background:#4A90D9;color:#fff;border:none;border-radius:50px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--ffs);">
+        🔊 <span>Tiếng Anh</span>
+      </button>
+      <button onclick="docTuVungVi()" style="display:flex;align-items:center;gap:5px;background:var(--pink4);color:#fff;border:none;border-radius:50px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--ffs);">
+        🔊 <span>Tiếng Việt</span>
+      </button>
     </div>
-    <div style="font-size:12px;color:var(--ice4);margin-top:4px;font-family:var(--ffs);" id="vn-m">Động vật lớn nhất trên cạn</div>
+
+    <!-- Câu mô tả nhỏ -->
+    <div style="font-size:11px;color:#aaa;font-family:var(--ffs);" id="vn-m">Động vật lớn nhất trên cạn</div>
   </div>
+
+  <!-- Grid chọn từ -->
   <div class="g3" id="vn-grid"></div>
+
   <div class="btn-row">
     <button class="btn-g" onclick="truocTu()">← Trước</button>
     <button class="btn-pink" onclick="tiepTu()">Từ tiếp →</button>
@@ -997,6 +1061,7 @@ canvas{display:block;touch-action:none;}
 var _viVoice = null, _voicesLoaded = false;
 var _ttsRate = 0.82, _ttsPitch = 1.1;
 var _xp = 0, _bai = 0;
+var _sayTimer = null; // debounce timer
 
 function _applyVoices(vv){
   _voicesLoaded = true;
@@ -1015,6 +1080,16 @@ function say(text){
   if(!window.speechSynthesis || !text) return;
   var c = text.replace(/[*_`#\[\]]/g,'').replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
   if(!c) return;
+  // Debounce: huỷ timer cũ, đợi 80ms rồi mới đọc
+  // → tránh trường hợp 2 lệnh say() liên tiếp trong cùng 1 event
+  if(_sayTimer) clearTimeout(_sayTimer);
+  _sayTimer = setTimeout(function(){
+    _sayTimer = null;
+    _doSayNow(c);
+  }, 80);
+}
+
+function _doSayNow(c){
   function _doSpeak(){
     try{ window.speechSynthesis.cancel(); }catch(e){}
     var u = new SpeechSynthesisUtterance(c);
@@ -1029,9 +1104,7 @@ function say(text){
     u.onend=function(){ document.querySelectorAll('.snd').forEach(function(b){ b.classList.remove('playing'); }); };
     u.onerror=function(e){
       document.querySelectorAll('.snd').forEach(function(b){ b.classList.remove('playing'); });
-      if(e.error==='interrupted'||e.error==='canceled'){
-        setTimeout(function(){ try{ window.speechSynthesis.speak(new SpeechSynthesisUtterance(c)); }catch(err){} },300);
-      }
+      // KHÔNG retry khi bị interrupt — đó là do say() mới cancel say() cũ, hoàn toàn bình thường
     };
     try{ window.speechSynthesis.speak(u); }catch(e){}
   }
@@ -1175,9 +1248,12 @@ var VAN_BAI=[
 ];
 
 var DAU_THANH=[
-  {lb:'Không dấu',doc:'không có dấu'},{lb:'Dấu huyền',doc:'dấu huyền'},
-  {lb:'Dấu sắc',doc:'dấu sắc'},{lb:'Dấu hỏi',doc:'dấu hỏi'},
-  {lb:'Dấu ngã',doc:'dấu ngã'},{lb:'Dấu nặng',doc:'dấu nặng'},
+  {lb:'a',  ten:'Không dấu', doc:'không có dấu'},
+  {lb:'à',  ten:'Dấu huyền', doc:'dấu huyền'},
+  {lb:'á',  ten:'Dấu sắc',   doc:'dấu sắc'},
+  {lb:'ả',  ten:'Dấu hỏi',   doc:'dấu hỏi'},
+  {lb:'ã',  ten:'Dấu ngã',   doc:'dấu ngã'},
+  {lb:'ạ',  ten:'Dấu nặng',  doc:'dấu nặng'},
 ];
 
 var VAN_LIST=['an','ân','ăn','ang','anh','ao','âu','ay','ăy','ia','iê','oa','oe','oi','ôi','ơi','ua','ue','ui','ươ','uy','ya','ac','ach','at','ăt','âc','ong','ông','ung','ăng','âng'];
@@ -1280,47 +1356,63 @@ var TN_PAL=[
   {c:'#FFD700',n:'Nắng vàng'},{c:'#1E90FF',n:'Nước biển'},{c:'#FF69B4',n:'Hoa hồng'},{c:'#F5C842',n:'Hoa vàng'},
 ];
 var TU_VUNG={
-  'Động vật':[
-    {e:'🐘',t:'Con voi',m:'Động vật lớn nhất trên cạn'},
-    {e:'🦁',t:'Sư tử',m:'Vua của rừng xanh'},
-    {e:'🐬',t:'Cá heo',m:'Rất thông minh, sống dưới biển'},
-    {e:'🦒',t:'Hươu cao cổ',m:'Con vật có cổ dài nhất'},
-    {e:'🐧',t:'Chim cánh cụt',m:'Sống ở nơi băng tuyết lạnh'},
-    {e:'🦊',t:'Con cáo',m:'Lanh lợi và khéo léo'},
-    {e:'🐸',t:'Con ếch',m:'Sống cả dưới nước và trên cạn'},
-    {e:'🦋',t:'Con bướm',m:'Bay lượn nhẹ nhàng, cánh rất đẹp'},
-    {e:'🐝',t:'Con ong',m:'Làm ra mật ong ngọt ngào'},
-    {e:'🐨',t:'Gấu túi',m:'Ăn lá bạch đàn, từ nước Úc'},
+  'Animals':[
+    {e:'🐘',en:'Elephant',   t:'Con voi',        m:'Con voi — Động vật lớn nhất trên cạn'},
+    {e:'🦁',en:'Lion',       t:'Sư tử',          m:'Con sư tử — Vua của rừng xanh'},
+    {e:'🐬',en:'Dolphin',    t:'Cá heo',         m:'Con cá heo — Rất thông minh'},
+    {e:'🦒',en:'Giraffe',    t:'Hươu cao cổ',    m:'Hươu cao cổ — Cổ dài nhất'},
+    {e:'🐧',en:'Penguin',    t:'Chim cánh cụt',  m:'Chim cánh cụt — Sống ở vùng băng'},
+    {e:'🦊',en:'Fox',        t:'Con cáo',        m:'Con cáo — Lanh lợi và khéo léo'},
+    {e:'🐸',en:'Frog',       t:'Con ếch',        m:'Con ếch — Sống cả dưới nước và trên cạn'},
+    {e:'🦋',en:'Butterfly',  t:'Con bướm',       m:'Con bướm — Cánh rất đẹp'},
+    {e:'🐝',en:'Bee',        t:'Con ong',        m:'Con ong — Làm ra mật ong ngọt'},
+    {e:'🐨',en:'Koala',      t:'Gấu túi',        m:'Con koala — Từ nước Úc'},
+    {e:'🐱',en:'Cat',        t:'Con mèo',        m:'Con mèo — Kêu meo meo'},
+    {e:'🐶',en:'Dog',        t:'Con chó',        m:'Con chó — Trung thành với chủ'},
+    {e:'🐰',en:'Rabbit',     t:'Con thỏ',        m:'Con thỏ — Tai dài, nhảy nhanh'},
+    {e:'🐼',en:'Panda',      t:'Gấu trúc',       m:'Gấu trúc — Ăn tre, trắng đen'},
+    {e:'🦜',en:'Parrot',     t:'Con vẹt',        m:'Con vẹt — Biết nói tiếng người'},
+    {e:'🐢',en:'Turtle',     t:'Con rùa',        m:'Con rùa — Sống rất lâu'},
   ],
-  'Trái cây':[
-    {e:'🍎',t:'Quả táo',m:'Màu đỏ, giòn ngọt và ngon'},
-    {e:'🍊',t:'Quả cam',m:'Màu vàng cam, nhiều vitamin C'},
-    {e:'🍓',t:'Quả dâu tây',m:'Màu đỏ hồng, thơm ngon'},
-    {e:'🍌',t:'Quả chuối',m:'Màu vàng, rất bổ dưỡng'},
-    {e:'🍇',t:'Chùm nho',m:'Có màu tím hoặc xanh'},
-    {e:'🥝',t:'Quả kiwi',m:'Vỏ nâu, ruột xanh ngọt'},
-    {e:'🍍',t:'Quả dứa',m:'Có lá trên đỉnh, vị chua ngọt'},
-    {e:'🍉',t:'Quả dưa hấu',m:'Ruột đỏ, hạt đen, mát lạnh'},
+  'Fruits':[
+    {e:'🍎',en:'Apple',      t:'Quả táo',        m:'Quả táo — Màu đỏ, giòn ngọt'},
+    {e:'🍊',en:'Orange',     t:'Quả cam',        m:'Quả cam — Màu vàng cam, nhiều vitamin'},
+    {e:'🍓',en:'Strawberry', t:'Dâu tây',        m:'Dâu tây — Màu đỏ hồng, thơm ngon'},
+    {e:'🍌',en:'Banana',     t:'Quả chuối',      m:'Quả chuối — Màu vàng, bổ dưỡng'},
+    {e:'🍇',en:'Grapes',     t:'Chùm nho',       m:'Chùm nho — Màu tím hoặc xanh'},
+    {e:'🥝',en:'Kiwi',       t:'Quả kiwi',       m:'Quả kiwi — Vỏ nâu, ruột xanh'},
+    {e:'🍍',en:'Pineapple',  t:'Quả dứa',        m:'Quả dứa — Có lá trên đỉnh'},
+    {e:'🍉',en:'Watermelon', t:'Dưa hấu',        m:'Dưa hấu — Ruột đỏ, mát lạnh'},
+    {e:'🍑',en:'Peach',      t:'Quả đào',        m:'Quả đào — Mềm mịn, màu hồng'},
+    {e:'🍋',en:'Lemon',      t:'Quả chanh',      m:'Quả chanh — Màu vàng, vị chua'},
+    {e:'🍒',en:'Cherry',     t:'Quả anh đào',    m:'Quả anh đào — Đỏ nhỏ, rất ngọt'},
+    {e:'🥭',en:'Mango',      t:'Quả xoài',       m:'Quả xoài — Màu vàng, thơm ngon'},
   ],
-  'Đồ vật':[
-    {e:'📚',t:'Sách vở',m:'Dùng để học bài mỗi ngày'},
-    {e:'✏️',t:'Bút chì',m:'Dùng để viết và vẽ'},
-    {e:'🎒',t:'Cặp sách',m:'Đựng sách vở đi học'},
-    {e:'🎨',t:'Hộp màu',m:'Dùng để tô tranh vẽ hình'},
-    {e:'🪆',t:'Búp bê',m:'Đồ chơi bé gái rất thích'},
-    {e:'🎀',t:'Cái nơ',m:'Buộc tóc màu hồng xinh'},
-    {e:'🖍️',t:'Bút màu sáp',m:'Vẽ và tô màu'},
-    {e:'🪁',t:'Cái ná',m:'Đồ chơi bắn xa'},
+  'Colors':[
+    {e:'🔴',en:'Red',        t:'Màu đỏ',         m:'Màu đỏ — Red — Như quả táo'},
+    {e:'🟠',en:'Orange',     t:'Màu cam',        m:'Màu cam — Orange — Như quả cam'},
+    {e:'🟡',en:'Yellow',     t:'Màu vàng',       m:'Màu vàng — Yellow — Như mặt trời'},
+    {e:'🟢',en:'Green',      t:'Màu xanh lá',    m:'Màu xanh lá — Green — Như cây cỏ'},
+    {e:'🔵',en:'Blue',       t:'Màu xanh dương', m:'Màu xanh — Blue — Như bầu trời'},
+    {e:'🟣',en:'Purple',     t:'Màu tím',        m:'Màu tím — Purple — Như hoa lavender'},
+    {e:'🩷',en:'Pink',       t:'Màu hồng',       m:'Màu hồng — Pink — Màu của Elsa'},
+    {e:'🟤',en:'Brown',      t:'Màu nâu',        m:'Màu nâu — Brown — Như đất'},
+    {e:'⬛',en:'Black',      t:'Màu đen',        m:'Màu đen — Black — Như ban đêm'},
+    {e:'⬜',en:'White',      t:'Màu trắng',      m:'Màu trắng — White — Như tuyết'},
   ],
-  'Thiên nhiên':[
-    {e:'🌸',t:'Hoa anh đào',m:'Màu hồng rất đẹp, nở vào mùa xuân'},
-    {e:'🌈',t:'Cầu vồng',m:'Xuất hiện sau cơn mưa, có bảy màu'},
-    {e:'⭐',t:'Ngôi sao',m:'Sáng lấp lánh trên bầu trời đêm'},
-    {e:'🌊',t:'Sóng biển',m:'Nước biển xanh mát và rộng lớn'},
-    {e:'🏔️',t:'Núi cao',m:'Rất cao, có tuyết phủ ở đỉnh'},
-    {e:'☀️',t:'Mặt trời',m:'Tỏa ánh sáng và hơi ấm cho muôn loài'},
-    {e:'🌙',t:'Mặt trăng',m:'Sáng vào ban đêm'},
-    {e:'❄️',t:'Bông tuyết',m:'Lạnh, màu trắng, hình sáu cánh'},
+  'Nature':[
+    {e:'🌸',en:'Cherry blossom',t:'Hoa anh đào', m:'Hoa anh đào — Màu hồng rất đẹp'},
+    {e:'🌈',en:'Rainbow',    t:'Cầu vồng',       m:'Cầu vồng — Xuất hiện sau mưa'},
+    {e:'⭐',en:'Star',        t:'Ngôi sao',       m:'Ngôi sao — Sáng trên bầu trời đêm'},
+    {e:'🌊',en:'Ocean',       t:'Biển',           m:'Đại dương — Xanh mát và rộng lớn'},
+    {e:'🏔️',en:'Mountain',   t:'Núi cao',        m:'Núi cao — Có tuyết phủ ở đỉnh'},
+    {e:'☀️',en:'Sun',         t:'Mặt trời',       m:'Mặt trời — Tỏa ánh sáng và hơi ấm'},
+    {e:'🌙',en:'Moon',        t:'Mặt trăng',      m:'Mặt trăng — Sáng vào ban đêm'},
+    {e:'❄️',en:'Snowflake',   t:'Bông tuyết',     m:'Bông tuyết — Lạnh, trắng, sáu cánh'},
+    {e:'🌺',en:'Flower',      t:'Bông hoa',       m:'Bông hoa — Đẹp và thơm ngát'},
+    {e:'🌳',en:'Tree',        t:'Cây xanh',       m:'Cây xanh — Cho ta bóng mát'},
+    {e:'🦋',en:'Butterfly',   t:'Con bướm',       m:'Con bướm — Bay nhẹ nhàng'},
+    {e:'🌞',en:'Sunshine',    t:'Nắng vàng',      m:'Nắng vàng — Ấm áp và tươi vui'},
   ],
 };
 var TRANH=[
@@ -1353,9 +1445,32 @@ function docMau(){
   var rn=document.getElementById('mrn').textContent;
   say(_mixN1+' pha với '+_mixN2+' ra màu '+rn);
 }
+var _sayEnTimer = null;
+function sayEn(txt){
+  if(!window.speechSynthesis||!txt) return;
+  if(_sayEnTimer) clearTimeout(_sayEnTimer);
+  if(_sayTimer) clearTimeout(_sayTimer);
+  _sayEnTimer = setTimeout(function(){
+    _sayEnTimer = null;
+    try{ window.speechSynthesis.cancel(); }catch(e){}
+    var u=new SpeechSynthesisUtterance(txt);
+    u.lang='en-US'; u.rate=0.78; u.pitch=1.1; u.volume=1;
+    var vs=window.speechSynthesis.getVoices()||[];
+    var ev=vs.find(function(v){return v.lang==='en-US'&&(v.name.toLowerCase().includes('female')||v.name.toLowerCase().includes('woman')||v.name.toLowerCase().includes('zira')||v.name.toLowerCase().includes('samantha'));})
+         ||vs.find(function(v){return v.lang==='en-US';})
+         ||vs.find(function(v){return v.lang&&v.lang.startsWith('en');})
+         ||null;
+    if(ev) u.voice=ev;
+    u.onerror=function(){};
+    try{window.speechSynthesis.speak(u);}catch(ex){}
+  }, 80);
+}
 function docTuVung(){
   var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];
-  var w=ds[_curVnIdx]; if(w) say(w.t+'. '+w.m);
+  var w=ds[_curVnIdx]; if(!w) return;
+  // Đọc tiếng Anh trước, rồi tiếng Việt sau 1.2s
+  sayEn(w.en);
+  setTimeout(function(){ say(w.t); },1200);
 }
 function docVan(){ say(VAN_BAI[_curVanBai].doc); }
 function docGhep(){ say(GHEP_LIST[_curGhep].doc); }
@@ -1457,17 +1572,29 @@ function renderVanSection(){
   var b=VAN_BAI[_curVanBai];
   document.getElementById('van-am').textContent=b.van;
   document.getElementById('van-boxes').innerHTML=b.van.split('').map(function(c){return '<div class="sbox">'+c+'</div>';}).join('')+'<div class="sbox empty">[dấu]</div>';
-  document.getElementById('van-tones').innerHTML=DAU_THANH.map(function(d,i){return '<div class="stab '+(i===0?'on':'')+'" style="font-size:11px;text-align:center;" onclick="chonDau('+i+',this,'+b.dung+',\''+b.am+'\')">'+d.lb+'</div>';}).join('');
+  // Mỗi ô: chữ mẫu có dấu (to) + tên dấu nhỏ bên dưới
+  document.getElementById('van-tones').innerHTML=DAU_THANH.map(function(d,i){
+    return '<div class="dau-btn '+(i===0?'on':'')+'" onclick="chonDau('+i+',this,'+b.dung+',\''+b.am+'\')">'
+      +'<span class="dau-chu">'+d.lb+'</span>'
+      +'<span class="dau-ten">'+d.ten+'</span>'
+      +'</div>';
+  }).join('');
   document.getElementById('van-msg').textContent='';
   renderGhepVan();
   var bv=document.getElementById('bang-van');
   if(bv) bv.innerHTML=VAN_LIST.map(function(v){return '<div style="padding:4px 9px;border-radius:8px;background:var(--ice1);border:1px solid var(--ice2);font-size:12px;font-weight:600;color:var(--ice5);cursor:pointer;font-family:var(--ffs);" onclick="say(\'vần '+v+'\')">'+v+'</div>';}).join('');
 }
 function chonDau(i,el,correct,am){
-  document.querySelectorAll('#van-tones .stab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('#van-tones .dau-btn').forEach(function(t){t.classList.remove('on');});
   el.classList.add('on');
-  if(i===correct){document.getElementById('van-msg').textContent='🎉 Đúng! '+DAU_THANH[i].doc+'!';say('Đúng rồi! Âm '+am+' có '+DAU_THANH[i].doc);addXP(5);}
-  else{document.getElementById('van-msg').textContent='💛 Chọn '+DAU_THANH[correct].lb+' nhé Mây!';say('Chưa đúng! Hãy chọn '+DAU_THANH[correct].doc+' nhé Mây!');}
+  if(i===correct){
+    document.getElementById('van-msg').textContent='🎉 Đúng! '+DAU_THANH[i].ten+'!';
+    say('Đúng rồi! Âm '+am+' có '+DAU_THANH[i].doc);
+    addXP(5);
+  } else {
+    document.getElementById('van-msg').textContent='💛 Mây hãy chọn dấu có chữ: '+DAU_THANH[correct].lb;
+    say('Chưa đúng! Hãy chọn '+DAU_THANH[correct].doc+' nhé Mây!');
+  }
 }
 function vanMoi(){_curVanBai=Math.floor(Math.random()*VAN_BAI.length);renderVanSection();}
 function renderGhepVan(){
@@ -1535,22 +1662,22 @@ function renderSo(){
   for(var i=_curSo;i<10;i++) h+='<div class="dot off"></div>';
   dg.innerHTML=h;
 }
-function doiSo(d){_curSo=Math.max(0,Math.min(20,_curSo+d));renderSo();mkNhanSoGrid();docSo();}
-function mkNhanSoGrid(){
+function doiSo(d){_curSo=Math.max(0,Math.min(20,_curSo+d));renderSo();mkNhanSoGrid(false);docSo();}
+function mkNhanSoGrid(silent){
   var correct=_curSo; var opts=[correct];
   while(opts.length<10){var x=Math.floor(Math.random()*21);if(!opts.includes(x))opts.push(x);}
   opts.sort(function(){return Math.random()-.5;});
   var el=document.getElementById('nhan-so-grid'); if(!el) return;
   el.innerHTML=opts.map(function(o){return '<div class="numbox" onclick="checkNhanSo(this,'+o+','+correct+')">'+o+'</div>';}).join('');
   document.getElementById('nhan-so-msg').textContent='Tìm số '+correct+' nhé Mây!';
-  say('Mây hãy tìm số '+TEN_SO[correct]+' nhé!');
+  if(!silent) say('Mây hãy tìm số '+TEN_SO[correct]+' nhé!');
 }
 function checkNhanSo(el,val,correct){
   document.querySelectorAll('#nhan-so-grid .numbox').forEach(function(b){b.onclick=null;});
   if(val===correct){
     el.classList.add('ok'); document.getElementById('nhan-so-msg').textContent='🎉 Đúng rồi! Số '+correct+'!';
     say('Đúng rồi! Đây là số '+TEN_SO[correct]+'. Mây thông minh quá!'); addXP(5);
-    setTimeout(function(){mkNhanSoGrid();document.querySelectorAll('#nhan-so-grid .numbox').forEach(function(b){b.onclick=function(){checkNhanSo(this,parseInt(this.textContent),correct);};});},1800);
+    setTimeout(function(){mkNhanSoGrid(true);document.querySelectorAll('#nhan-so-grid .numbox').forEach(function(b){b.onclick=function(){checkNhanSo(this,parseInt(this.textContent),correct);};});},1800);
   } else {
     el.classList.add('bad'); document.getElementById('nhan-so-msg').textContent='💛 Thử lại! Số '+correct+' ở chỗ khác!';
     say('Thử lại nhé Mây! Số '+TEN_SO[correct]+' ở chỗ khác!');
@@ -1813,6 +1940,7 @@ function blendHex(h1,h2){try{var r1=parseInt(h1.slice(1,3),16),g1=parseInt(h1.sl
 /* ════════════════════ TỪ VỰNG ════════════════════ */
 function initTu(){
   var el=document.getElementById('tabs-tu');if(!el)return;
+  // Hiển thị tab với tên chủ đề (giữ nguyên tiếng Anh)
   el.innerHTML=_vnTopics.map(function(t,i){return '<div class="stab '+(i===0?'on':'')+'" onclick="chonChuDe('+i+',this)">'+t+'</div>';}).join('');
   renderVN();
 }
@@ -1820,13 +1948,41 @@ function chonChuDe(i,el){_curVnTopic=i;_curVnIdx=0;document.querySelectorAll('#t
 function renderVN(){
   var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];var w=ds[_curVnIdx];if(!w)return;
   document.getElementById('vn-e').textContent=w.e;
+  // Tên tiếng Anh — to, nổi bật
+  var enEl=document.getElementById('vn-en'); if(enEl) enEl.textContent=w.en||w.t;
+  // Tên tiếng Việt — nhỏ hơn
   document.getElementById('vn-t').textContent=w.t;
+  // Nghĩa mô tả
   document.getElementById('vn-m').textContent=w.m;
-  document.getElementById('vn-grid').innerHTML=ds.slice(0,6).map(function(d,i){return '<div class="card" style="'+(i===_curVnIdx?'border-color:var(--ice4);background:var(--ice1);':'')+'" onclick="chonTu('+i+')"><span class="ce">'+d.e+'</span><div class="cl" style="font-size:10px;">'+d.t+'</div></div>';}).join('');
+  // Grid: hiển thị emoji + tên TIẾNG ANH to + Việt nhỏ
+  document.getElementById('vn-grid').innerHTML=ds.slice(0,6).map(function(d,i){
+    return '<div class="card" style="'+(i===_curVnIdx?'border-color:var(--ice4);background:var(--ice1);':'')+'" onclick="chonTu('+i+')">'
+      +'<span class="ce">'+d.e+'</span>'
+      +'<div class="cl" style="font-size:12px;font-weight:800;color:var(--ice5);">'+(d.en||d.t)+'</div>'
+      +'<div style="font-size:9px;color:var(--ice4);font-family:var(--ffs);margin-top:1px;">'+d.t+'</div>'
+      +'</div>';
+  }).join('');
 }
-function chonTu(i){_curVnIdx=i;renderVN();docTuVung();}
-function tiepTu(){var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];_curVnIdx=(_curVnIdx+1)%ds.length;renderVN();docTuVung();}
-function truocTu(){var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];_curVnIdx=(_curVnIdx-1+ds.length)%ds.length;renderVN();docTuVung();}
+function docTuVungEn(){
+  var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];
+  var w=ds[_curVnIdx]; if(!w) return;
+  sayEn(w.en||w.t);
+}
+function docTuVungVi(){
+  var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];
+  var w=ds[_curVnIdx]; if(!w) return;
+  say(w.t+'. '+w.m);
+}
+function chonTu(i){
+  _curVnIdx=i; renderVN();
+  // Đọc tiếng Anh trước, Việt sau
+  var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];
+  var w=ds[i]; if(!w) return;
+  sayEn(w.en||w.t);
+  setTimeout(function(){say(w.t);},1100);
+}
+function tiepTu(){var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];_curVnIdx=(_curVnIdx+1)%ds.length;renderVN();chonTu(_curVnIdx);}
+function truocTu(){var ds=TU_VUNG[_vnTopics[_curVnTopic]]||[];_curVnIdx=(_curVnIdx-1+ds.length)%ds.length;renderVN();chonTu(_curVnIdx);}
 
 /* ════════════════════ XP → SAO TÍCH ĐIỂM ════════════════════ */
 var STAR_KEY='may_stars_v2';
