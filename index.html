@@ -735,10 +735,6 @@ canvas{display:block;touch-action:none;}
       <div class="msg" id="van-msg"></div>
       <div class="btn-row"><button class="btn-g" onclick="vanMoi()">Vần khác →</button></div>
     </div>
-    <div class="mbox">
-      <div class="mbox-t">📋 Bảng vần — bấm để nghe</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;" id="bang-van"></div>
-    </div>
     <div class="mbox" style="margin-top:0;">
       <div class="mbox-t">🔡 Ghép âm thành vần</div>
       <div id="ghep-van" style="text-align:center;"></div>
@@ -1618,7 +1614,10 @@ function initChu(){
 function tabChu(i,el){
   ['chu-hoc','chu-van','chu-viet','chu-on'].forEach(function(id,j){var d=document.getElementById(id);if(d)d.style.display=j===i?'block':'none';});
   document.querySelectorAll('#tabs-chu .stab').forEach(function(t,j){t.classList.toggle('on',j===i);});
-  if(i===2) initWriteChu(); if(i===3) renderOnChu();
+  if(i===0) setTimeout(function(){say('Mây hãy bấm vào chữ để nghe âm nhé!');},400);
+  if(i===1) setTimeout(function(){say('Mây hãy chọn dấu thanh đúng cho vần này nhé!');},400);
+  if(i===2){initWriteChu();setTimeout(function(){say('Mây hãy viết chữ theo mẫu nhé! Nhìn chữ chấm rồi tô theo!');},400);}
+  if(i===3){renderOnChu();setTimeout(function(){say('Ôn luyện! Mây hãy tìm đúng chữ nhé!');},400);}
 }
 function renderChu(){
   var C=CHU[_curChu];
@@ -1654,7 +1653,6 @@ function tiepChu(){if(_curChu<CHU.length-1){_curChu++;renderChu();mkNhanChuGrid(
 function truocChu(){if(_curChu>0){_curChu--;renderChu();mkNhanChuGrid();docChu();}}
 function renderVanSection(){
   var b=VAN_BAI[_curVanBai];
-  // Hiển thị âm gốc chữ thường
   document.getElementById('van-am').textContent=b.van;
   document.getElementById('van-boxes').innerHTML=b.van.split('').map(function(c){
     return '<div class="sbox">'+c+'</div>';
@@ -1668,13 +1666,12 @@ function renderVanSection(){
   }).join('');
   document.getElementById('van-msg').textContent='';
   renderGhepVan();
-  var bv=document.getElementById('bang-van');
-  if(bv) bv.innerHTML=VAN_LIST.map(function(v){return '<div style="padding:4px 9px;border-radius:8px;background:var(--ice1);border:1px solid var(--ice2);font-size:12px;font-weight:600;color:var(--ice5);cursor:pointer;font-family:var(--ffs);" onclick="say(\'vần '+v+'\')">'+v+'</div>';}).join('');
+  // Đọc hướng dẫn cho bé
+  setTimeout(function(){ say('Vần '+b.van+'. Mây hãy chọn dấu thanh đúng nhé!'); }, 300);
 }
 function chonDau(i,el,correct,am){
   document.querySelectorAll('#van-tones .dau-btn').forEach(function(t){t.classList.remove('on');});
   el.classList.add('on');
-  // Cập nhật ô hiển thị ký hiệu + chữ ghép được
   var sb=document.getElementById('sbox-dau');
   if(sb){
     sb.textContent=DAU_THANH[i].sym;
@@ -1683,11 +1680,18 @@ function chonDau(i,el,correct,am){
   }
   if(i===correct){
     document.getElementById('van-msg').textContent='🎉 Đúng! Đọc là: '+am;
-    say(am);  // đọc từ có dấu đúng ngay lập tức
+    say(am);  // đọc ĐÚNG toàn từ có dấu: "bà", "bá", "mẹ"...
     addXP(5);
   } else {
+    // Tìm từ tương ứng với dấu đang chọn (sai) để bé nghe thử
+    var b=VAN_BAI[_curVanBai];
+    // Tìm trong VAN_BAI xem vần này với dấu i là từ gì
+    var amThu=VAN_BAI.find(function(v){return v.van===b.van&&v.am&&VAN_BAI.indexOf(v)>=0&&DAU_THANH.findIndex(function(d){return d.ky===v.am[v.am.length-1];})===-1;});
+    // Đơn giản: dùng am của entry có dung===i cùng vần
+    var entry=VAN_BAI.find(function(v){return v.van===b.van&&v.dung===i;});
+    var docAm = entry ? entry.am : DAU_THANH[i].ten;
     document.getElementById('van-msg').textContent='💛 Thử lại! Chọn dấu '+DAU_THANH[correct].ten;
-    say(DAU_THANH[i].ky);  // đọc âm của dấu đang chọn để bé nghe thử
+    say(docAm);
   }
 }
 function vanMoi(){_curVanBai=Math.floor(Math.random()*VAN_BAI.length);renderVanSection();}
@@ -1710,10 +1714,42 @@ function initWriteChu(){
   if(!guide||!write) return;
   var gc=guide.getContext('2d'); _wChuCtx=write.getContext('2d');
   gc.clearRect(0,0,340,190);
-  gc.font='bold 140px serif'; gc.textAlign='center'; gc.textBaseline='middle';
-  gc.fillStyle='rgba(74,144,217,0.15)'; gc.fillText(CHU[_curChu].ch,170,98);
-  gc.strokeStyle='rgba(74,144,217,0.25)'; gc.lineWidth=2; gc.setLineDash([6,5]); gc.strokeText(CHU[_curChu].ch,170,98);
-  _wChuCtx.clearRect(0,0,340,190); setupDraw(write,_wChuCtx,'ice');
+
+  // Vẽ nền kẻ dòng như vở học sinh
+  gc.strokeStyle='rgba(100,160,220,0.18)';
+  gc.lineWidth=1; gc.setLineDash([]);
+  var lines=[38,95,152]; // 3 đường kẻ ngang
+  lines.forEach(function(y){gc.beginPath();gc.moveTo(10,y);gc.lineTo(330,y);gc.stroke();});
+  // Đường giữa (đứt) ở y=66, 123
+  gc.setLineDash([4,4]); gc.strokeStyle='rgba(100,160,220,0.12)';
+  [66,123].forEach(function(y){gc.beginPath();gc.moveTo(10,y);gc.lineTo(330,y);gc.stroke();});
+  gc.setLineDash([]);
+
+  // Vẽ 2 chữ mẫu (chữ thường cursive Việt Nam) để bé nhìn theo
+  gc.font='italic 110px "Segoe Script","Comic Sans MS","Brush Script MT",cursive';
+  gc.textAlign='center'; gc.textBaseline='middle';
+  // Chữ mẫu 1 - to nhạt
+  gc.fillStyle='rgba(74,144,217,0.20)';
+  gc.fillText(CHU[_curChu].ch, 90, 100);
+  // Viền nét đứt
+  gc.strokeStyle='rgba(74,144,217,0.35)'; gc.lineWidth=1.5;
+  gc.setLineDash([5,4]);
+  gc.strokeText(CHU[_curChu].ch, 90, 100);
+  // Chữ mẫu 2 - mờ hơn
+  gc.fillStyle='rgba(74,144,217,0.10)';
+  gc.fillText(CHU[_curChu].ch, 220, 100);
+  gc.strokeStyle='rgba(74,144,217,0.18)';
+  gc.strokeText(CHU[_curChu].ch, 220, 100);
+  gc.setLineDash([]);
+
+  // Số thứ tự điểm bắt đầu nét
+  gc.font='bold 11px sans-serif'; gc.fillStyle='rgba(232,85,154,0.6)';
+  gc.textAlign='left'; gc.fillText('① Viết theo', 10, 15);
+  gc.fillStyle='rgba(74,144,217,0.5)';
+  gc.fillText('② Tự viết →', 155, 15);
+
+  _wChuCtx.clearRect(0,0,340,190);
+  setupDraw(write,_wChuCtx,'ice');
 }
 function xoaVietChu(){if(_wChuCtx)_wChuCtx.clearRect(0,0,340,190);}
 function renderOnChu(){
@@ -1737,12 +1773,17 @@ function checkOnQ(el,val,correct,doc_str){
 /* ════════════════════ SỐ HỌC ════════════════════ */
 function initSo(){
   mkStabs('tabs-so',['🔢 Nhận số','➕ Phép tính','⚖️ So sánh','🔢 Đếm đồ vật','✏️ Luyện viết'],'tabSo');
-  renderSo(); mkNhanSoGrid(); baiSSMoi(); baiDemMoi();
+  renderSo(); mkNhanSoGrid(false); baiSSMoi();
+  // KHÔNG gọi baiDemMoi() ở đây - chỉ gọi khi bấm tab Đếm đồ vật
 }
 function tabSo(i,el){
   ['so-nhan','so-tinh','so-ss','so-dem','so-viet'].forEach(function(id,j){var d=document.getElementById(id);if(d)d.style.display=j===i?'block':'none';});
   document.querySelectorAll('#tabs-so .stab').forEach(function(t,j){t.classList.toggle('on',j===i);});
-  if(i===1) baiTinhMoi(); if(i===4) initWriteSo();
+  if(i===0){mkNhanSoGrid(false);} // Nhận số - đọc đề
+  if(i===1) baiTinhMoi();         // Phép tính - đọc đề
+  if(i===2){baiSSMoi();}          // So sánh - đọc đề
+  if(i===3) baiDemMoi();          // Đếm đồ vật - chỉ đọc khi bấm tab này
+  if(i===4) initWriteSo();
 }
 function renderSo(){
   document.getElementById('so-hien').textContent=_curSo;
