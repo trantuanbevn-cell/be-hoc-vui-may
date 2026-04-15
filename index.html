@@ -1279,15 +1279,79 @@ var CHU=[
 var TEN_SO=['Không','Một','Hai','Ba','Bốn','Năm','Sáu','Bảy','Tám','Chín','Mười','Mười một','Mười hai','Mười ba','Mười bốn','Mười lăm','Mười sáu','Mười bảy','Mười tám','Mười chín','Hai mươi'];
 
 var VAN_BAI=[
-  {van:'ba',am:'ba',dung:0,doc:'âm ba không dấu'},{van:'ba',am:'bà',dung:1,doc:'âm bà dấu huyền'},
-  {van:'ba',am:'bá',dung:2,doc:'âm bá dấu sắc'},{van:'be',am:'bé',dung:2,doc:'âm bé dấu sắc'},
-  {van:'me',am:'mẹ',dung:5,doc:'âm mẹ dấu nặng'},{van:'bo',am:'bò',dung:1,doc:'âm bò dấu huyền'},
-  {van:'ca',am:'cá',dung:2,doc:'âm cá dấu sắc'},{van:'la',am:'lá',dung:2,doc:'âm lá dấu sắc'},
-  {van:'sua',am:'sữa',dung:4,doc:'âm sữa dấu ngã'},{van:'hoi',am:'hỏi',dung:3,doc:'âm hỏi dấu hỏi'},
-  {van:'no',am:'nó',dung:2,doc:'âm nó dấu sắc'},{van:'mo',am:'mỏ',dung:3,doc:'âm mỏ dấu hỏi'},
-  {van:'ga',am:'gà',dung:1,doc:'âm gà dấu huyền'},{van:'co',am:'cò',dung:1,doc:'âm cò dấu huyền'},
-  {van:'tu',am:'tủ',dung:3,doc:'âm tủ dấu hỏi'},{van:'do',am:'đỏ',dung:2,doc:'âm đỏ dấu sắc'},
+  // Vần BA - đủ 6 dấu
+  {van:'ba',am:'ba', dung:0,doc:'ba, số ba'       },
+  {van:'ba',am:'bà', dung:1,doc:'bà, bà ngoại'    },
+  {van:'ba',am:'bá', dung:2,doc:'bá, bá vương'    },
+  {van:'ba',am:'bả', dung:3,doc:'bả, bả vai'      },
+  {van:'ba',am:'bã', dung:4,doc:'bã, bã trầu'     },
+  {van:'ba',am:'bạ', dung:5,doc:'bạ, bạ đâu'      },
+  // Vần BE - đủ 6 dấu
+  {van:'be',am:'be', dung:0,doc:'be, be bé'        },
+  {van:'be',am:'bè', dung:1,doc:'bè, bè gỗ'       },
+  {van:'be',am:'bé', dung:2,doc:'bé, em bé'        },
+  {van:'be',am:'bẻ', dung:3,doc:'bẻ, bẻ gãy'      },
+  {van:'be',am:'bẽ', dung:4,doc:'bẽ, bẽ bàng'     },
+  {van:'be',am:'bẹ', dung:5,doc:'bẹ, bẹ chuối'    },
+  // Vần ME - đủ 6 dấu
+  {van:'me',am:'me', dung:0,doc:'me, cây me chua'  },
+  {van:'me',am:'mè', dung:1,doc:'mè, hạt mè'       },
+  {van:'me',am:'mé', dung:2,doc:'mé, mé sông'      },
+  {van:'me',am:'mẻ', dung:3,doc:'mẻ, mẻ chua'     },
+  {van:'me',am:'mẽ', dung:4,doc:'mẽ, hào mẽ'      },
+  {van:'me',am:'mẹ', dung:5,doc:'mẹ, mẹ yêu'      },
+  // Vần BO - đủ 6 dấu
+  {van:'bo',am:'bo', dung:0,doc:'bo, bo bo'        },
+  {van:'bo',am:'bò', dung:1,doc:'bò, con bò'       },
+  {van:'bo',am:'bó', dung:2,doc:'bó, bó rau'       },
+  {van:'bo',am:'bỏ', dung:3,doc:'bỏ, bỏ đi'       },
+  {van:'bo',am:'bõ', dung:4,doc:'bõ, bõ công'     },
+  {van:'bo',am:'bọ', dung:5,doc:'bọ, con bọ'      },
+  // Vần CA - đủ 6 dấu
+  {van:'ca',am:'ca', dung:0,doc:'ca, ca hát'       },
+  {van:'ca',am:'cà', dung:1,doc:'cà, cà tím'       },
+  {van:'ca',am:'cá', dung:2,doc:'cá, con cá'       },
+  {van:'ca',am:'cả', dung:3,doc:'cả, cả hai'       },
+  {van:'ca',am:'cã', dung:4,doc:'cã, cã lời'      },
+  {van:'ca',am:'cạ', dung:5,doc:'cạ, cạ sát'      },
+  // Vần GA - đủ 6 dấu
+  {van:'ga',am:'ga', dung:0,doc:'ga, nhà ga'       },
+  {van:'ga',am:'gà', dung:1,doc:'gà, con gà'       },
+  {van:'ga',am:'gá', dung:2,doc:'gá, gá lắp'      },
+  {van:'ga',am:'gả', dung:3,doc:'gả, gả chồng'    },
+  {van:'ga',am:'gã', dung:4,doc:'gã, gã lái'      },
+  {van:'ga',am:'gạ', dung:5,doc:'gạ, gạ gẫm'     },
+  // Vần NO - đủ 6 dấu
+  {van:'no',am:'no', dung:0,doc:'no, no bụng'      },
+  {van:'no',am:'nò', dung:1,doc:'nò, cái nò'       },
+  {van:'no',am:'nó', dung:2,doc:'nó, nó đây'       },
+  {van:'no',am:'nỏ', dung:3,doc:'nỏ, cái nỏ'      },
+  {van:'no',am:'nõ', dung:4,doc:'nõ, nõ tre'      },
+  {van:'no',am:'nọ', dung:5,doc:'nọ, cái nọ'      },
+  // Vần MO - đủ 6 dấu
+  {van:'mo',am:'mo', dung:0,doc:'mo, mo cau'       },
+  {van:'mo',am:'mò', dung:1,doc:'mò, mò cua'       },
+  {van:'mo',am:'mó', dung:2,doc:'mó, mó tay'       },
+  {van:'mo',am:'mỏ', dung:3,doc:'mỏ, mỏ chim'     },
+  {van:'mo',am:'mõ', dung:4,doc:'mõ, cái mõ'      },
+  {van:'mo',am:'mọ', dung:5,doc:'mọ, mọ rợ'       },
+  // Vần TU - đủ 6 dấu
+  {van:'tu',am:'tu', dung:0,doc:'tu, tu hành'      },
+  {van:'tu',am:'tù', dung:1,doc:'tù, ngồi tù'     },
+  {van:'tu',am:'tú', dung:2,doc:'tú, tú tài'      },
+  {van:'tu',am:'tủ', dung:3,doc:'tủ, cái tủ'      },
+  {van:'tu',am:'tũ', dung:4,doc:'tũ, tũ lụa'     },
+  {van:'tu',am:'tụ', dung:5,doc:'tụ, tụ tập'      },
+  // Vần LA - đủ 6 dấu
+  {van:'la',am:'la', dung:0,doc:'la, la hét'       },
+  {van:'la',am:'là', dung:1,doc:'là, là gì'        },
+  {van:'la',am:'lá', dung:2,doc:'lá, lá cây'       },
+  {van:'la',am:'lả', dung:3,doc:'lả, lả người'    },
+  {van:'la',am:'lã', dung:4,doc:'lã, lã mắt'      },
+  {van:'la',am:'lạ', dung:5,doc:'lạ, lạ lẫm'      },
 ];
+// Danh sách các vần dùng để random bài mới - chọn 1 vần đại diện mỗi nhóm
+var VAN_NHOM=['ba','be','me','bo','ca','ga','no','mo','tu','la'];
 
 var DAU_THANH=[
   {ky:'a', sym:'—', ten:'không dấu',  doc:'không dấu',  mau:'#888'},
@@ -1666,8 +1730,18 @@ function renderVanSection(){
   }).join('');
   document.getElementById('van-msg').textContent='';
   renderGhepVan();
-  // Đọc hướng dẫn cho bé
-  setTimeout(function(){ say('Vần '+b.van+'. Mây hãy chọn dấu thanh đúng nhé!'); }, 300);
+  // Đọc hướng dẫn: đọc từ cần tìm để bé nghe và chọn đúng dấu
+  setTimeout(function(){ say('Đây là vần '+b.van+'. Mây hãy chọn dấu để đọc thành '+b.am+' nhé!'); }, 300);
+}
+function vanMoi(){
+  // Chọn ngẫu nhiên 1 vần, rồi lấy entry dung=correct ngẫu nhiên trong nhóm đó
+  var nhom=VAN_NHOM[Math.floor(Math.random()*VAN_NHOM.length)];
+  // Lấy tất cả entries của nhóm, chọn ngẫu nhiên 1 dung làm đáp án
+  var nhomEntries=VAN_BAI.filter(function(v){return v.van===nhom;});
+  var pick=nhomEntries[Math.floor(Math.random()*nhomEntries.length)];
+  // Tìm index trong VAN_BAI
+  _curVanBai=VAN_BAI.indexOf(pick);
+  renderVanSection();
 }
 function chonDau(i,el,correct,am){
   document.querySelectorAll('#van-tones .dau-btn').forEach(function(t){t.classList.remove('on');});
@@ -1678,23 +1752,20 @@ function chonDau(i,el,correct,am){
     sb.style.color=DAU_THANH[i].mau;
     sb.className='sbox'+(i===correct?' ok':' bad');
   }
+  // Tìm từ ghép tương ứng với vần hiện tại + dấu i trong VAN_BAI
+  var b=VAN_BAI[_curVanBai];
+  var entryChon=VAN_BAI.find(function(v){return v.van===b.van&&v.dung===i;});
+  var docAmChon=entryChon?entryChon.am:am; // fallback là am đúng
   if(i===correct){
     document.getElementById('van-msg').textContent='🎉 Đúng! Đọc là: '+am;
-    say(am);  // đọc ĐÚNG toàn từ có dấu: "bà", "bá", "mẹ"...
+    say(am);  // đọc ĐÚNG toàn từ: "bà", "bá", "mẹ", "bỏ", "bọ"...
     addXP(5);
   } else {
-    // Tìm từ tương ứng với dấu đang chọn (sai) để bé nghe thử
-    var b=VAN_BAI[_curVanBai];
-    // Tìm trong VAN_BAI xem vần này với dấu i là từ gì
-    var amThu=VAN_BAI.find(function(v){return v.van===b.van&&v.am&&VAN_BAI.indexOf(v)>=0&&DAU_THANH.findIndex(function(d){return d.ky===v.am[v.am.length-1];})===-1;});
-    // Đơn giản: dùng am của entry có dung===i cùng vần
-    var entry=VAN_BAI.find(function(v){return v.van===b.van&&v.dung===i;});
-    var docAm = entry ? entry.am : DAU_THANH[i].ten;
+    // Đọc từ ghép với dấu đang chọn (sai) để bé nghe và so sánh
     document.getElementById('van-msg').textContent='💛 Thử lại! Chọn dấu '+DAU_THANH[correct].ten;
-    say(docAm);
+    say(docAmChon); // vd bấm dấu hỏi trên "ba" → đọc "bả"
   }
 }
-function vanMoi(){_curVanBai=Math.floor(Math.random()*VAN_BAI.length);renderVanSection();}
 function renderGhepVan(){
   var g=GHEP_LIST[_curGhep]; var area=document.getElementById('ghep-van'); if(!area) return;
   area.innerHTML='<div style="display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;">'
