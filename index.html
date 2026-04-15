@@ -588,6 +588,13 @@ canvas{display:block;touch-action:none;}
 }
 .pal-dot:hover{transform:scale(1.15);}
 
+/* GHÉP ĐÔI */
+.gd-card{background:#fff;border:2.5px solid var(--ice2);border-radius:12px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;transition:all .15s;user-select:none;min-height:60px;}
+.gd-card:hover,.gd-card.sel{border-color:var(--ice4);background:var(--ice1);transform:scale(1.06);}
+.gd-card.ok{border-color:#9FE1CB;background:#EAF3DE;pointer-events:none;transform:none;}
+.gd-card.bad{border-color:#F7C1C1;background:#FCEBEB;animation:gdshake .3s;}
+@keyframes gdshake{0%,100%{transform:rotate(0);}30%{transform:rotate(-8deg);}70%{transform:rotate(8deg);}}
+
 /* ══ VOCAB FLASH ══ */
 .vn-flash{
   background:#fff;border:1.5px solid var(--ice2);border-radius:14px;
@@ -656,6 +663,7 @@ canvas{display:block;touch-action:none;}
       <div><div class="sc-val" id="xp-show">0</div><div class="sc-lbl">sao</div></div>
     </div>
     <button style="background:var(--pink4);color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:16px;cursor:pointer;" onclick="openPanel('cat')" title="Mèo Bông">🐱</button>
+    <button style="background:var(--ice1);color:var(--ice5);border:1.5px solid var(--ice2);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--ffs);" onclick="openPanel('speed')">🔈</button>
   </div>
 </div>
 
@@ -897,6 +905,28 @@ canvas{display:block;touch-action:none;}
 <!-- ═══ TƯ DUY LOGIC ═══ -->
 <div id="s-logic" class="scr">
   <div class="stab-row" id="tabs-logic"></div>
+  <!-- Tab dễ 1: Ghép đôi -->
+  <div id="lg-ghep">
+    <p class="stitle">🎯 Ghép đôi — tìm 2 hình giống nhau!</p>
+    <div class="mbox">
+      <div style="font-size:12px;color:var(--ice5);text-align:center;margin-bottom:10px;font-family:var(--ffs);" id="gd-hint">Bấm 2 hình giống nhau nhé!</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="gd-board"></div>
+      <div class="msg" id="gd-msg"></div>
+    </div>
+    <div class="btn-row"><button class="btn-pink" onclick="baiGhepDoi()">Chơi lại →</button></div>
+  </div>
+
+  <!-- Tab dễ 2: Màu & Hình đơn giản -->
+  <div id="lg-mauhinh" style="display:none;">
+    <p class="stitle">🌈 Màu sắc & hình dạng — chọn đúng!</p>
+    <div class="mbox">
+      <div style="font-size:14px;font-weight:700;color:var(--ice5);text-align:center;margin-bottom:12px;font-family:var(--ffs);" id="mh-cau">Câu hỏi...</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;" id="mh-opts"></div>
+      <div class="msg" id="mh-msg"></div>
+    </div>
+    <div class="btn-row"><button class="btn-pink" onclick="baiMauHinh()">Bài mới →</button></div>
+  </div>
+
   <div id="lg-day">
     <p class="stitle">🧠 Tìm hình thiếu trong dãy</p>
     <div class="mbox">
@@ -981,6 +1011,17 @@ canvas{display:block;touch-action:none;}
       <div style="font-size:10px;color:#e0f0ff;margin-top:2px;">Xanh biển · Tím</div>
     </div>
   </div>
+  <p class="stitle" style="margin-top:12px;">🖌️ Tô thử màu vừa pha!</p>
+  <div class="mbox" style="padding:10px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <div id="mix-preview-dot" style="width:28px;height:28px;border-radius:50%;background:#C5E3FF;border:2px solid var(--ice2);flex-shrink:0;"></div>
+      <span style="font-size:11px;font-weight:700;color:var(--ice5);font-family:var(--ffs);" id="mix-preview-name">Xanh nhạt</span>
+      <button class="snd" style="margin-left:4px;" onclick="docMau()">🔊</button>
+      <button class="btn-g" style="padding:3px 8px;font-size:10px;margin-left:auto;" onclick="xoaMixC()">🗑️ Xóa</button>
+    </div>
+    <canvas id="mixC" width="340" height="160" style="border-radius:10px;border:1.5px solid var(--ice2);cursor:crosshair;background:#fff;display:block;width:100%;"></canvas>
+    <div style="font-size:10px;color:var(--ice3);text-align:center;margin-top:5px;font-family:var(--ffs);">Chọn 2 màu bên trên → tô thử màu mới!</div>
+  </div>
 </div>
 
 <!-- ═══ TỪ VỰNG ═══ -->
@@ -1059,7 +1100,10 @@ canvas{display:block;touch-action:none;}
    5. Retry khi interrupted (iOS Safari)
 ════════════════════════════════════════════════════════ */
 var _viVoice = null, _voicesLoaded = false;
-var _ttsRate = 0.82, _ttsPitch = 1.1;
+var _ttsRate = parseFloat(localStorage.getItem('may_rate')||'0.65'), _ttsPitch = 1.1;
+function setTtsRate(v){_ttsRate=v;localStorage.setItem('may_rate',String(v));
+  say('Mây thử nghe tốc độ này nhé!');
+}
 var _xp = 0, _bai = 0;
 var _sayTimer = null; // debounce timer
 
@@ -1205,55 +1249,57 @@ function hideSplash(){
    DỮ LIỆU ỨNG DỤNG
 ════════════════════════════════════════════════════════ */
 var CHU=[
-  {ch:'A',doc:'chữ a, âm a, ví dụ áo',am:'a',vd:'áo',tu:[{e:'👗',w:'Áo'},{e:'🍎',w:'Ăn'}]},
-  {ch:'Ă',doc:'chữ ă, âm ă ngắn, ví dụ ăn cơm',am:'ă',vd:'ăn',tu:[{e:'🍚',w:'Ăn cơm'},{e:'🌱',w:'Ắc quy'}]},
-  {ch:'Â',doc:'chữ â, âm â, ví dụ cái âu',am:'â',vd:'âu',tu:[{e:'🪣',w:'Cái âu'},{e:'🎵',w:'Âm nhạc'}]},
-  {ch:'B',doc:'chữ b, âm bờ, ví dụ quả bóng',am:'bờ',vd:'bóng',tu:[{e:'⚽',w:'Bóng'},{e:'🦋',w:'Bướm'}]},
-  {ch:'C',doc:'chữ c, âm cờ, ví dụ con cá',am:'cờ',vd:'cá',tu:[{e:'🐟',w:'Cá'},{e:'🌳',w:'Cây'}]},
-  {ch:'D',doc:'chữ d, âm dờ, ví dụ quả dưa',am:'dờ',vd:'dưa',tu:[{e:'🍉',w:'Dưa'},{e:'🐐',w:'Dê'}]},
-  {ch:'Đ',doc:'chữ đ, âm đờ, ví dụ cái đèn',am:'đờ',vd:'đèn',tu:[{e:'💡',w:'Đèn'},{e:'🌺',w:'Đóa hoa'}]},
-  {ch:'E',doc:'chữ e, âm e, ví dụ em bé',am:'e',vd:'em bé',tu:[{e:'👶',w:'Em bé'},{e:'🐸',w:'Ếch'}]},
-  {ch:'Ê',doc:'chữ ê, âm ê, ví dụ con ếch',am:'ê',vd:'ếch',tu:[{e:'🐸',w:'Ếch'},{e:'🌙',w:'Êm ái'}]},
-  {ch:'G',doc:'chữ g, âm gờ, ví dụ con gà',am:'gờ',vd:'gà',tu:[{e:'🐔',w:'Gà'},{e:'🐻',w:'Gấu'}]},
-  {ch:'H',doc:'chữ h, âm hờ, ví dụ bông hoa',am:'hờ',vd:'hoa',tu:[{e:'🌸',w:'Hoa'},{e:'🦛',w:'Hà mã'}]},
-  {ch:'I',doc:'chữ i, âm i ngắn, ví dụ ít nước',am:'i',vd:'ít',tu:[{e:'💧',w:'Ít nước'},{e:'🍦',w:'Kem'}]},
-  {ch:'K',doc:'chữ k, âm ca, ví dụ kẹo ngọt',am:'ca',vd:'kẹo',tu:[{e:'🍬',w:'Kẹo'},{e:'🔑',w:'Khóa'}]},
-  {ch:'L',doc:'chữ l, âm lờ, ví dụ lá cây',am:'lờ',vd:'lá',tu:[{e:'🍃',w:'Lá cây'},{e:'🦁',w:'Sư tử'}]},
-  {ch:'M',doc:'chữ m, âm mờ, ví dụ con mèo',am:'mờ',vd:'mèo',tu:[{e:'🐱',w:'Mèo'},{e:'🌙',w:'Mặt trăng'}]},
-  {ch:'N',doc:'chữ n, âm nờ, ví dụ nụ hoa',am:'nờ',vd:'nụ hoa',tu:[{e:'🌹',w:'Nụ hoa'},{e:'🐦',w:'Nhạn'}]},
-  {ch:'O',doc:'chữ o, âm o, ví dụ con ong',am:'o',vd:'ong',tu:[{e:'🐝',w:'Ong'},{e:'☂️',w:'Ô dù'}]},
-  {ch:'Ô',doc:'chữ ô, âm ô, ví dụ cái ô dù',am:'ô',vd:'ô dù',tu:[{e:'☂️',w:'Ô dù'},{e:'🦜',w:'Ốc sên'}]},
-  {ch:'Ơ',doc:'chữ ơ, âm ơ, ví dụ quả ớt',am:'ơ',vd:'ớt',tu:[{e:'🌶️',w:'Ớt'},{e:'🗣️',w:'Ơi ơi'}]},
-  {ch:'P',doc:'chữ p, âm pờ, ví dụ pháo hoa',am:'pờ',vd:'pháo hoa',tu:[{e:'🎆',w:'Pháo hoa'},{e:'🍜',w:'Phở'}]},
-  {ch:'Q',doc:'chữ q, âm quờ, ví dụ cái quạt',am:'quờ',vd:'quạt',tu:[{e:'🌬️',w:'Quạt'},{e:'👑',w:'Quý bà'}]},
-  {ch:'R',doc:'chữ r, âm rờ, ví dụ con rắn',am:'rờ',vd:'rắn',tu:[{e:'🐍',w:'Rắn'},{e:'🌲',w:'Rừng'}]},
-  {ch:'S',doc:'chữ s, âm sờ, ví dụ ngôi sao',am:'sờ',vd:'sao',tu:[{e:'⭐',w:'Sao'},{e:'🦁',w:'Sư tử'}]},
-  {ch:'T',doc:'chữ t, âm tờ, ví dụ quả táo',am:'tờ',vd:'táo',tu:[{e:'🍎',w:'Táo'},{e:'🐯',w:'Hổ'}]},
-  {ch:'U',doc:'chữ u, âm u, ví dụ uống sữa',am:'u',vd:'uống sữa',tu:[{e:'🥛',w:'Uống sữa'},{e:'🦉',w:'Chim cú'}]},
-  {ch:'Ư',doc:'chữ ư, âm ư, ví dụ bị ướt',am:'ư',vd:'ướt',tu:[{e:'💦',w:'Ướt'},{e:'🌈',w:'Ươm mầm'}]},
-  {ch:'V',doc:'chữ v, âm vờ, ví dụ con voi',am:'vờ',vd:'voi',tu:[{e:'🐘',w:'Voi'},{e:'🦋',w:'Bướm'}]},
-  {ch:'X',doc:'chữ x, âm xờ, ví dụ xe ô tô',am:'xờ',vd:'xe ô tô',tu:[{e:'🚗',w:'Xe ô tô'},{e:'🌿',w:'Xanh lá'}]},
-  {ch:'Y',doc:'chữ y, âm y dài, ví dụ yêu thương',am:'y dài',vd:'yêu',tu:[{e:'❤️',w:'Yêu thương'},{e:'🌱',w:'Yên lặng'}]},
+  {ch:'a',doc:'chữ a, âm a, ví dụ áo',am:'a',vd:'áo',tu:[{e:'👗',w:'áo'},{e:'🍎',w:'ăn'}]},
+  {ch:'ă',doc:'chữ ă, âm ă ngắn, ví dụ ăn cơm',am:'ă',vd:'ăn',tu:[{e:'🍚',w:'ăn cơm'},{e:'🌱',w:'ắc quy'}]},
+  {ch:'â',doc:'chữ â, âm â, ví dụ cái âu',am:'â',vd:'âu',tu:[{e:'🪣',w:'cái âu'},{e:'🎵',w:'âm nhạc'}]},
+  {ch:'b',doc:'chữ b, âm bờ, ví dụ quả bóng',am:'bờ',vd:'bóng',tu:[{e:'⚽',w:'bóng'},{e:'🦋',w:'bướm'}]},
+  {ch:'c',doc:'chữ c, âm cờ, ví dụ con cá',am:'cờ',vd:'cá',tu:[{e:'🐟',w:'cá'},{e:'🌳',w:'cây'}]},
+  {ch:'d',doc:'chữ d, âm dờ, ví dụ quả dưa',am:'dờ',vd:'dưa',tu:[{e:'🍉',w:'dưa'},{e:'🐐',w:'dê'}]},
+  {ch:'đ',doc:'chữ đ, âm đờ, ví dụ cái đèn',am:'đờ',vd:'đèn',tu:[{e:'💡',w:'đèn'},{e:'🌺',w:'đóa hoa'}]},
+  {ch:'e',doc:'chữ e, âm e, ví dụ em bé',am:'e',vd:'em bé',tu:[{e:'👶',w:'em bé'},{e:'🐸',w:'ếch'}]},
+  {ch:'ê',doc:'chữ ê, âm ê, ví dụ con ếch',am:'ê',vd:'ếch',tu:[{e:'🐸',w:'ếch'},{e:'🌙',w:'êm ái'}]},
+  {ch:'g',doc:'chữ g, âm gờ, ví dụ con gà',am:'gờ',vd:'gà',tu:[{e:'🐔',w:'gà'},{e:'🐻',w:'gấu'}]},
+  {ch:'h',doc:'chữ h, âm hờ, ví dụ bông hoa',am:'hờ',vd:'hoa',tu:[{e:'🌸',w:'hoa'},{e:'🦛',w:'hà mã'}]},
+  {ch:'i',doc:'chữ i, âm i ngắn, ví dụ ít nước',am:'i',vd:'ít',tu:[{e:'💧',w:'ít nước'},{e:'🍦',w:'kem'}]},
+  {ch:'k',doc:'chữ k, âm ca, ví dụ kẹo ngọt',am:'ca',vd:'kẹo',tu:[{e:'🍬',w:'kẹo'},{e:'🔑',w:'khóa'}]},
+  {ch:'l',doc:'chữ l, âm lờ, ví dụ lá cây',am:'lờ',vd:'lá',tu:[{e:'🍃',w:'lá cây'},{e:'🦁',w:'sư tử'}]},
+  {ch:'m',doc:'chữ m, âm mờ, ví dụ con mèo',am:'mờ',vd:'mèo',tu:[{e:'🐱',w:'mèo'},{e:'🌙',w:'mặt trăng'}]},
+  {ch:'n',doc:'chữ n, âm nờ, ví dụ nụ hoa',am:'nờ',vd:'nụ hoa',tu:[{e:'🌹',w:'nụ hoa'},{e:'🐦',w:'nhạn'}]},
+  {ch:'o',doc:'chữ o, âm o, ví dụ con ong',am:'o',vd:'ong',tu:[{e:'🐝',w:'ong'},{e:'☂️',w:'ô dù'}]},
+  {ch:'ô',doc:'chữ ô, âm ô, ví dụ cái ô dù',am:'ô',vd:'ô dù',tu:[{e:'☂️',w:'ô dù'},{e:'🦜',w:'ốc sên'}]},
+  {ch:'ơ',doc:'chữ ơ, âm ơ, ví dụ quả ớt',am:'ơ',vd:'ớt',tu:[{e:'🌶️',w:'ớt'},{e:'🌈',w:'ơi ơi'}]},
+  {ch:'p',doc:'chữ p, âm pờ, ví dụ pháo hoa',am:'pờ',vd:'pháo hoa',tu:[{e:'🎆',w:'pháo hoa'},{e:'🍜',w:'phở'}]},
+  {ch:'q',doc:'chữ q, âm quờ, ví dụ cái quạt',am:'quờ',vd:'quạt',tu:[{e:'🌬️',w:'quạt'},{e:'👑',w:'quý bà'}]},
+  {ch:'r',doc:'chữ r, âm rờ, ví dụ con rắn',am:'rờ',vd:'rắn',tu:[{e:'🐍',w:'rắn'},{e:'🌲',w:'rừng'}]},
+  {ch:'s',doc:'chữ s, âm sờ, ví dụ ngôi sao',am:'sờ',vd:'sao',tu:[{e:'⭐',w:'sao'},{e:'🦁',w:'sư tử'}]},
+  {ch:'t',doc:'chữ t, âm tờ, ví dụ quả táo',am:'tờ',vd:'táo',tu:[{e:'🍎',w:'táo'},{e:'🐯',w:'hổ'}]},
+  {ch:'u',doc:'chữ u, âm u, ví dụ uống sữa',am:'u',vd:'uống sữa',tu:[{e:'🥛',w:'uống sữa'},{e:'🦉',w:'chim cú'}]},
+  {ch:'ư',doc:'chữ ư, âm ư, ví dụ bị ướt',am:'ư',vd:'ướt',tu:[{e:'💦',w:'ướt'},{e:'🌈',w:'ươm mầm'}]},
+  {ch:'v',doc:'chữ v, âm vờ, ví dụ con voi',am:'vờ',vd:'voi',tu:[{e:'🐘',w:'voi'},{e:'🦋',w:'bướm'}]},
+  {ch:'x',doc:'chữ x, âm xờ, ví dụ xe ô tô',am:'xờ',vd:'xe ô tô',tu:[{e:'🚗',w:'xe ô tô'},{e:'🌿',w:'xanh lá'}]},
+  {ch:'y',doc:'chữ y, âm y dài, ví dụ yêu thương',am:'y dài',vd:'yêu',tu:[{e:'❤️',w:'yêu thương'},{e:'🌱',w:'yên lặng'}]},
 ];
 
 var TEN_SO=['Không','Một','Hai','Ba','Bốn','Năm','Sáu','Bảy','Tám','Chín','Mười','Mười một','Mười hai','Mười ba','Mười bốn','Mười lăm','Mười sáu','Mười bảy','Mười tám','Mười chín','Hai mươi'];
 
 var VAN_BAI=[
-  {van:'BA',am:'ba',dung:0,doc:'âm ba không dấu'},{van:'BA',am:'bà',dung:1,doc:'âm bà dấu huyền'},
-  {van:'BA',am:'bá',dung:2,doc:'âm bá dấu sắc'},{van:'BE',am:'bé',dung:2,doc:'âm bé dấu sắc'},
-  {van:'ME',am:'mẹ',dung:5,doc:'âm mẹ dấu nặng'},{van:'BO',am:'bò',dung:1,doc:'âm bò dấu huyền'},
-  {van:'CA',am:'cá',dung:2,doc:'âm cá dấu sắc'},{van:'LA',am:'lá',dung:2,doc:'âm lá dấu sắc'},
-  {van:'SUA',am:'sữa',dung:4,doc:'âm sữa dấu ngã'},{van:'HOI',am:'hỏi',dung:3,doc:'âm hỏi dấu hỏi'},
-  {van:'NO',am:'nó',dung:2,doc:'âm nó dấu sắc'},{van:'MO',am:'mỏ',dung:3,doc:'âm mỏ dấu hỏi'},
+  {van:'ba',am:'ba',dung:0,doc:'âm ba không dấu'},{van:'ba',am:'bà',dung:1,doc:'âm bà dấu huyền'},
+  {van:'ba',am:'bá',dung:2,doc:'âm bá dấu sắc'},{van:'be',am:'bé',dung:2,doc:'âm bé dấu sắc'},
+  {van:'me',am:'mẹ',dung:5,doc:'âm mẹ dấu nặng'},{van:'bo',am:'bò',dung:1,doc:'âm bò dấu huyền'},
+  {van:'ca',am:'cá',dung:2,doc:'âm cá dấu sắc'},{van:'la',am:'lá',dung:2,doc:'âm lá dấu sắc'},
+  {van:'sua',am:'sữa',dung:4,doc:'âm sữa dấu ngã'},{van:'hoi',am:'hỏi',dung:3,doc:'âm hỏi dấu hỏi'},
+  {van:'no',am:'nó',dung:2,doc:'âm nó dấu sắc'},{van:'mo',am:'mỏ',dung:3,doc:'âm mỏ dấu hỏi'},
+  {van:'ga',am:'gà',dung:1,doc:'âm gà dấu huyền'},{van:'co',am:'cò',dung:1,doc:'âm cò dấu huyền'},
+  {van:'tu',am:'tủ',dung:3,doc:'âm tủ dấu hỏi'},{van:'do',am:'đỏ',dung:2,doc:'âm đỏ dấu sắc'},
 ];
 
 var DAU_THANH=[
-  {lb:'a',  ten:'Không dấu', doc:'không có dấu'},
-  {lb:'à',  ten:'Dấu huyền', doc:'dấu huyền'},
-  {lb:'á',  ten:'Dấu sắc',   doc:'dấu sắc'},
-  {lb:'ả',  ten:'Dấu hỏi',   doc:'dấu hỏi'},
-  {lb:'ã',  ten:'Dấu ngã',   doc:'dấu ngã'},
-  {lb:'ạ',  ten:'Dấu nặng',  doc:'dấu nặng'},
+  {ky:'a', sym:'—', ten:'không dấu',  doc:'không dấu',  mau:'#888'},
+  {ky:'à', sym:'\\',ten:'dấu huyền', doc:'dấu huyền',  mau:'#2C6FAC'},
+  {ky:'á', sym:'/', ten:'dấu sắc',   doc:'dấu sắc',    mau:'#C23878'},
+  {ky:'ả', sym:'?', ten:'dấu hỏi',   doc:'dấu hỏi',    mau:'#3B6D11'},
+  {ky:'ã', sym:'~', ten:'dấu ngã',   doc:'dấu ngã',    mau:'#854F0B'},
+  {ky:'ạ', sym:'.', ten:'dấu nặng',  doc:'dấu nặng',   mau:'#A32D2D'},
 ];
 
 var VAN_LIST=['an','ân','ăn','ang','anh','ao','âu','ay','ăy','ia','iê','oa','oe','oi','ôi','ơi','ua','ue','ui','ươ','uy','ya','ac','ach','at','ăt','âc','ong','ông','ung','ăng','âng'];
@@ -1266,11 +1312,13 @@ var GHEP_LIST=[
 ];
 
 var DEM_BAI=[
-  {icon:'🌸',ten:'bông hoa',so:3},{icon:'⭐',ten:'ngôi sao',so:5},{icon:'🍎',ten:'quả táo',so:4},
-  {icon:'🐱',ten:'con mèo',so:2},{icon:'🎀',ten:'cái nơ',so:6},{icon:'🦋',ten:'con bướm',so:3},
-  {icon:'❄️',ten:'bông tuyết',so:8},{icon:'💎',ten:'viên kim cương',so:7},{icon:'🐝',ten:'con ong',so:4},
-  {icon:'🍬',ten:'cái kẹo',so:5},{icon:'🌺',ten:'bông hoa đỏ',so:3},{icon:'🐠',ten:'con cá',so:6},
-  {icon:'🌟',ten:'ngôi sao vàng',so:4},{icon:'🩷',ten:'trái tim hồng',so:5},{icon:'🐸',ten:'con ếch',so:3},
+  {icon:'🌸',ten:'bông hoa',so:3},{icon:'⭐',ten:'ngôi sao',so:4},{icon:'🍎',ten:'quả táo',so:2},
+  {icon:'🐱',ten:'con mèo',so:3},{icon:'🎀',ten:'cái nơ',so:5},{icon:'🦋',ten:'con bướm',so:3},
+  {icon:'🐝',ten:'con ong',so:4},{icon:'🍬',ten:'cái kẹo',so:5},{icon:'🌺',ten:'bông hoa',so:2},
+  {icon:'🐠',ten:'con cá',so:3},{icon:'🌟',ten:'ngôi sao',so:4},{icon:'🍊',ten:'quả cam',so:3},
+  {icon:'🐸',ten:'con ếch',so:2},{icon:'🦆',ten:'con vịt',so:4},{icon:'🍓',ten:'quả dâu',so:5},
+  {icon:'🐞',ten:'con bọ rùa',so:3},{icon:'🌻',ten:'hoa hướng dương',so:4},{icon:'🍇',ten:'chùm nho',so:2},
+  {icon:'🦜',ten:'con vẹt',so:3},{icon:'🐤',ten:'chú gà con',so:5},{icon:'🍌',ten:'quả chuối',so:4},
 ];
 
 var DAY_SEQ=[
@@ -1424,6 +1472,29 @@ var TRANH=[
 
 /* ════════════════════ TRẠNG THÁI ════════════════════ */
 var _curChu=0,_curSo=5,_curVanBai=0,_curGhep=0;
+
+/* ═══ HỆ THỐNG 5 CHỮ / NGÀY ═══
+   Mỗi nhóm 5 chữ, học 10 buổi/nhóm rồi chuyển nhóm tiếp
+*/
+var _chuState=(function(){
+  try{return JSON.parse(localStorage.getItem('may_chu_v1'))||{grp:0,ses:1};}
+  catch(e){return {grp:0,ses:1};}
+})();
+function _saveChu(){localStorage.setItem('may_chu_v1',JSON.stringify(_chuState));}
+function _getChuNhom(){
+  var s=_chuState.grp*5, arr=[];
+  for(var i=s;i<Math.min(s+5,CHU.length);i++) arr.push(i);
+  return arr;
+}
+function _chuGroupInfo(){
+  return 'Nhóm '+((_chuState.grp+1))+'/'+Math.ceil(CHU.length/5)+' · Buổi '+_chuState.ses+'/10';
+}
+function nextChuSession(){
+  _chuState.ses++;
+  if(_chuState.ses>10){_chuState.ses=1;_chuState.grp++;
+    if(_chuState.grp*5>=CHU.length)_chuState.grp=0;}
+  _saveChu(); initChu();
+}
 var _curPhep='?',_curSoSanh={a:7,b:4};
 var _curTranh='elsa',_artCtx=null,_artColor='#89C4E1',_artSize=6,_artEraser=false;
 var _wChuCtx=null,_wSoCtx=null;
@@ -1443,7 +1514,7 @@ function docTinh(){
 function docSS(){ say('So sánh số '+_curSoSanh.a+' và số '+_curSoSanh.b+'. Số nào lớn hơn?'); }
 function docMau(){
   var rn=document.getElementById('mrn').textContent;
-  say(_mixN1+' pha với '+_mixN2+' ra màu '+rn);
+  say(_mixN1+' pha với '+_mixN2+' ra '+rn);
 }
 var _sayEnTimer = null;
 function sayEn(txt){
@@ -1529,6 +1600,19 @@ function renderHome(){
 /* ════════════════════ CHỮ CÁI ════════════════════ */
 function initChu(){
   mkStabs('tabs-chu',['📖 Học chữ','🔤 Đánh vần','✏️ Viết','📅 Ôn luyện'],'tabChu');
+  // Set chữ hiện tại = chữ đầu tiên của nhóm
+  var nhom=_getChuNhom(); _curChu=nhom[0];
+  // Banner nhóm hôm nay
+  var sc=document.getElementById('s-chu');
+  var old=sc.querySelector('.chu-banner'); if(old) old.remove();
+  var bn=document.createElement('div'); bn.className='chu-banner';
+  bn.style.cssText='background:linear-gradient(135deg,var(--ice1),var(--pink1));border:1.5px solid var(--ice2);border-radius:12px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;';
+  bn.innerHTML='<div>'
+    +'<div style="font-size:11px;font-weight:800;color:var(--ice5);font-family:var(--ffs);">📅 '+_chuGroupInfo()+'</div>'
+    +'<div style="font-size:10px;color:var(--ice4);font-family:var(--ffs);">Hôm nay học: <b>'+nhom.map(function(i){return CHU[i].ch;}).join(' · ')+'</b></div>'
+    +'</div>'
+    +'<button class="btn-g" style="font-size:10px;padding:4px 9px;" onclick="nextChuSession()">Buổi mới →</button>';
+  sc.insertBefore(bn,sc.firstChild);
   renderChu(); mkNhanChuGrid(); renderVanSection(); renderVietChu(); renderOnChu();
 }
 function tabChu(i,el){
@@ -1542,7 +1626,7 @@ function renderChu(){
   document.getElementById('ltr-am').textContent='Chữ '+C.ch+' — âm '+C.am+' — ví dụ: '+C.vd;
   document.getElementById('viet-ch-lb').textContent=C.ch;
   document.getElementById('nhan-target').textContent=C.ch;
-  document.getElementById('ltr-pills').innerHTML=CHU.map(function(c,i){return '<div class="pill '+(i===_curChu?'on':i<_curChu?'done':'')+'" onclick="nhayDenChu('+i+')">'+c.ch+'</div>';}).join('');
+  document.getElementById('ltr-pills').innerHTML=(function(){var nhom=_getChuNhom();return CHU.map(function(c,i){var inGrp=nhom.includes(i);return '<div class="pill '+(i===_curChu?'on':i<_curChu?'done':'')+'"'+(inGrp&&i!==_curChu?' style="background:var(--pink1);border-color:var(--pink3);"':'')+' onclick="nhayDenChu('+i+')">'+c.ch+'</div>';}).join('');})();
   document.getElementById('ltr-tu').innerHTML=C.tu.map(function(w){return '<div style="background:#fff;border:1.5px solid var(--ice2);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;" onclick="say(\''+w.w+'\')"><span style="font-size:22px;">'+w.e+'</span><span style="font-size:12px;font-weight:700;color:var(--ice5);font-family:var(--ffs);">'+w.w+'</span></div>';}).join('');
 }
 function mkNhanChuGrid(){
@@ -1570,12 +1654,15 @@ function tiepChu(){if(_curChu<CHU.length-1){_curChu++;renderChu();mkNhanChuGrid(
 function truocChu(){if(_curChu>0){_curChu--;renderChu();mkNhanChuGrid();docChu();}}
 function renderVanSection(){
   var b=VAN_BAI[_curVanBai];
+  // Hiển thị âm gốc chữ thường
   document.getElementById('van-am').textContent=b.van;
-  document.getElementById('van-boxes').innerHTML=b.van.split('').map(function(c){return '<div class="sbox">'+c+'</div>';}).join('')+'<div class="sbox empty">[dấu]</div>';
-  // Mỗi ô: chữ mẫu có dấu (to) + tên dấu nhỏ bên dưới
+  document.getElementById('van-boxes').innerHTML=b.van.split('').map(function(c){
+    return '<div class="sbox">'+c+'</div>';
+  }).join('')+'<div class="sbox empty" id="sbox-dau" style="font-size:22px;font-weight:900;min-width:40px;">?</div>';
+  // Ký hiệu dấu như ảnh: — \ / ? ~ .
   document.getElementById('van-tones').innerHTML=DAU_THANH.map(function(d,i){
     return '<div class="dau-btn '+(i===0?'on':'')+'" onclick="chonDau('+i+',this,'+b.dung+',\''+b.am+'\')">'
-      +'<span class="dau-chu">'+d.lb+'</span>'
+      +'<span class="dau-chu" style="font-size:28px;font-weight:900;color:'+d.mau+';">'+d.sym+'</span>'
       +'<span class="dau-ten">'+d.ten+'</span>'
       +'</div>';
   }).join('');
@@ -1587,13 +1674,20 @@ function renderVanSection(){
 function chonDau(i,el,correct,am){
   document.querySelectorAll('#van-tones .dau-btn').forEach(function(t){t.classList.remove('on');});
   el.classList.add('on');
+  // Cập nhật ô hiển thị ký hiệu + chữ ghép được
+  var sb=document.getElementById('sbox-dau');
+  if(sb){
+    sb.textContent=DAU_THANH[i].sym;
+    sb.style.color=DAU_THANH[i].mau;
+    sb.className='sbox'+(i===correct?' ok':' bad');
+  }
   if(i===correct){
-    document.getElementById('van-msg').textContent='🎉 Đúng! '+DAU_THANH[i].ten+'!';
-    say('Đúng rồi! Âm '+am+' có '+DAU_THANH[i].doc);
+    document.getElementById('van-msg').textContent='🎉 Đúng! Đọc là: '+am;
+    say(am);  // đọc từ có dấu đúng ngay lập tức
     addXP(5);
   } else {
-    document.getElementById('van-msg').textContent='💛 Mây hãy chọn dấu có chữ: '+DAU_THANH[correct].lb;
-    say('Chưa đúng! Hãy chọn '+DAU_THANH[correct].doc+' nhé Mây!');
+    document.getElementById('van-msg').textContent='💛 Thử lại! Chọn dấu '+DAU_THANH[correct].ten;
+    say(DAU_THANH[i].ky);  // đọc âm của dấu đang chọn để bé nghe thử
   }
 }
 function vanMoi(){_curVanBai=Math.floor(Math.random()*VAN_BAI.length);renderVanSection();}
@@ -1624,8 +1718,8 @@ function initWriteChu(){
 function xoaVietChu(){if(_wChuCtx)_wChuCtx.clearRect(0,0,340,190);}
 function renderOnChu(){
   var el=document.getElementById('on-chu-area'); if(!el) return;
-  var seed=new Date().getDate();
-  var nhom=[CHU[(seed*3)%CHU.length],CHU[(seed*3+7)%CHU.length],CHU[(seed*3+14)%CHU.length]];
+  var nhomIdx=_getChuNhom();
+  var nhom=nhomIdx.map(function(i){return CHU[i];});
   var C=nhom[Math.floor(Math.random()*nhom.length)];
   el.innerHTML='<div class="mbox"><div class="mbox-t">🔤 Ba chữ ôn hôm nay</div><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">'
     +nhom.map(function(C){return '<div style="text-align:center;cursor:pointer;" onclick="say(\''+C.doc+'\')"><div style="font-size:52px;color:var(--ice4);font-weight:700;font-family:var(--ffs);">'+C.ch+'</div><div style="font-size:10px;color:var(--ice5);font-family:var(--ffs);">âm: '+C.am+'</div><div style="font-size:9px;color:var(--ice4);font-family:var(--ffs);">ví dụ: '+C.vd+'</div></div>';}).join('')
@@ -1737,7 +1831,10 @@ function chonSS(c){
 }
 function baiDemMoi(){
   var q=DEM_BAI[Math.floor(Math.random()*DEM_BAI.length)];
-  document.getElementById('dem-items').textContent=q.icon.repeat(q.so);
+  var grid='<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 0;">';
+  for(var _di=0;_di<q.so;_di++) grid+='<span style="font-size:40px;line-height:1.1;">'+q.icon+'</span>';
+  grid+='</div>';
+  document.getElementById('dem-items').innerHTML=grid;
   document.getElementById('dem-ten').textContent=q.ten;
   var opts=[q.so]; while(opts.length<4){var x=Math.floor(Math.random()*10)+1;if(!opts.includes(x))opts.push(x);}
   opts.sort(function(){return Math.random()-.5;});
@@ -1844,13 +1941,19 @@ function newPuzzle(){_piecePlaced=new Array(9).fill(null);_selPiece=null;documen
 
 /* ════════════════════ LOGIC ════════════════════ */
 function initLogic(){
-  mkStabs('tabs-logic',['🧠 Tìm hình thiếu','🔷 Hình học','🗂️ Phân loại','🔄 Quy luật','🔢 Dãy số'],'tabLogic');
-  baiDayMoi();
+  mkStabs('tabs-logic',['🎯 Ghép đôi','🌈 Màu & Hình','🧠 Tìm hình thiếu','🔷 Hình học','🗂️ Phân loại','🔄 Quy luật','🔢 Dãy số'],'tabLogic');
+  baiGhepDoi();
 }
 function tabLogic(i,el){
-  ['lg-day','lg-hinh','lg-pl','lg-ql','lg-bk'].forEach(function(id,j){var d=document.getElementById(id);if(d)d.style.display=j===i?'block':'none';});
+  ['lg-ghep','lg-mauhinh','lg-day','lg-hinh','lg-pl','lg-ql','lg-bk'].forEach(function(id,j){var d=document.getElementById(id);if(d)d.style.display=j===i?'block':'none';});
   document.querySelectorAll('#tabs-logic .stab').forEach(function(t,j){t.classList.toggle('on',j===i);});
-  if(i===0)baiDayMoi();if(i===1){initHinhAll();baiHinhMoi();}if(i===2)baiPLMoi();if(i===3)baiQLMoi();if(i===4)baiBKMoi();
+  if(i===0)baiGhepDoi();
+  else if(i===1)baiMauHinh();
+  else if(i===2)baiDayMoi();
+  else if(i===3){initHinhAll();baiHinhMoi();}
+  else if(i===4)baiPLMoi();
+  else if(i===5)baiQLMoi();
+  else if(i===6)baiBKMoi();
 }
 function baiDayMoi(){
   var q=DAY_SEQ[Math.floor(Math.random()*DAY_SEQ.length)];
@@ -1924,15 +2027,48 @@ function checkBK(val,correct){
 }
 
 /* ════════════════════ MÀU SẮC ════════════════════ */
-function initMau(){
+function initMau(){setTimeout(initMixCanvas,80);
   var el=document.getElementById('full-pal');if(!el)return;
   el.innerHTML=FULL_PAL.map(function(p){return '<div class="pal-dot" style="background:'+p.c+';border-color:'+(_mixC1===p.c||_mixC2===p.c?'#333':'transparent')+';" onclick="chonPhaMau(\''+p.c+'\',\''+p.n+'\')" title="'+p.n+'"></div>';}).join('');
   var ep=document.getElementById('elsa-pal');if(ep)ep.innerHTML=ELSA_PAL.map(function(p){return '<div style="background:#fff;border:1.5px solid var(--ice2);border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;" onclick="say(\'Màu '+p.n+'\')"><div style="width:30px;height:30px;border-radius:50%;background:'+p.c+';border:1.5px solid var(--ice2);margin:0 auto 4px;"></div><div style="font-size:9px;color:var(--ice5);font-weight:700;font-family:var(--ffs);">'+p.n+'</div></div>';}).join('');
   var tp=document.getElementById('tn-pal');if(tp)tp.innerHTML=TN_PAL.map(function(p){return '<div style="background:#fff;border:1.5px solid var(--ice2);border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;" onclick="say(\'Màu '+p.n+'\')"><div style="width:30px;height:30px;border-radius:50%;background:'+p.c+';border:1.5px solid var(--ice2);margin:0 auto 4px;"></div><div style="font-size:9px;color:var(--ice5);font-weight:700;font-family:var(--ffs);">'+p.n+'</div></div>';}).join('');
 }
+function _tenMau(h1,h2){
+  var r1=parseInt(h1.slice(1,3),16)||128,g1=parseInt(h1.slice(3,5),16)||128,b1=parseInt(h1.slice(5,7),16)||128;
+  var r2=parseInt(h2.slice(1,3),16)||128,g2=parseInt(h2.slice(3,5),16)||128,b2=parseInt(h2.slice(5,7),16)||128;
+  var r=(r1+r2)/2,g=(g1+g2)/2,b=(b1+b2)/2;
+  if(r>g&&r>b){if(g>100)return 'màu cam';return 'màu đỏ hồng';}
+  if(g>r&&g>b){if(b>100)return 'màu xanh lam nhạt';return 'màu xanh lá nhạt';}
+  if(b>r&&b>g){if(r>100)return 'màu tím nhạt';return 'màu xanh nhạt';}
+  if(r>180&&g>180)return 'màu vàng nhạt';
+  if(r>180&&b>180)return 'màu hồng tím';
+  return 'màu pha mới';
+}
 function chonPhaMau(c,n){
-  if(_mixStep===0){_mixC1=c;_mixN1=n;document.getElementById('mc1').style.background=c;document.getElementById('mn1').textContent=n;document.getElementById('mix-hint').textContent='Bước 2: Bấm chọn màu thứ hai';_mixStep=1;say('Đã chọn màu '+n+'. Bây giờ chọn màu thứ hai nhé Mây!');}
-  else{_mixC2=c;_mixN2=n;document.getElementById('mc2').style.background=c;document.getElementById('mn2').textContent=n;var k=_mixC1+'+'+_mixC2;var res=MIX_MAP[k];var parts=res?res.split('|'):[blendHex(_mixC1,_mixC2),'Màu mới'];document.getElementById('mr').style.background=parts[0];document.getElementById('mrn').textContent=parts[1];document.getElementById('mix-hint').textContent='Bấm vào màu để chọn lại!';_mixStep=0;say(_mixN1+' pha với '+_mixN2+' ra màu '+parts[1]);initMau();}
+  if(_mixStep===0){
+    _mixC1=c;_mixN1=n;
+    document.getElementById('mc1').style.background=c;
+    document.getElementById('mn1').textContent=n;
+    document.getElementById('mix-hint').textContent='Bước 2: Bấm chọn màu thứ hai';
+    _mixStep=1;
+    say('Đã chọn màu '+n+'. Bây giờ chọn màu thứ hai nhé Mây!');
+  } else {
+    _mixC2=c;_mixN2=n;
+    document.getElementById('mc2').style.background=c;
+    document.getElementById('mn2').textContent=n;
+    var k=_mixC1+'+'+_mixC2;
+    var res=MIX_MAP[k];
+    var parts=res?res.split('|'):[blendHex(_mixC1,_mixC2),_tenMau(_mixC1,_mixC2)];
+    document.getElementById('mr').style.background=parts[0];
+    document.getElementById('mrn').textContent=parts[1];
+    document.getElementById('mix-hint').textContent='Bấm vào màu để chọn lại!';
+    _mixStep=0;
+    _mixCColor=parts[0];
+    var dp=document.getElementById('mix-preview-dot');if(dp)dp.style.background=parts[0];
+    var dn=document.getElementById('mix-preview-name');if(dn)dn.textContent=parts[1];
+    say(_mixN1+' pha với '+_mixN2+' ra '+parts[1]);
+    initMau();
+  }
 }
 function resetMix(){_mixStep=0;document.getElementById('mix-hint').textContent='Bước 1: Bấm chọn màu thứ nhất';}
 function blendHex(h1,h2){try{var r1=parseInt(h1.slice(1,3),16),g1=parseInt(h1.slice(3,5),16),b1=parseInt(h1.slice(5,7),16);var r2=parseInt(h2.slice(1,3),16),g2=parseInt(h2.slice(3,5),16),b2=parseInt(h2.slice(5,7),16);return '#'+[Math.round((r1+r2)/2),Math.round((g1+g2)/2),Math.round((b1+b2)/2)].map(function(v){return v.toString(16).padStart(2,'0');}).join('');}catch(e){return '#89C4E1';}}
@@ -2459,6 +2595,128 @@ function doChangePin(){
   document.body.appendChild(el);
   setTimeout(function(){if(el.parentNode)el.remove();},2000);
 }
+
+/* ════════════════════ GHÉP ĐÔI ════════════════════ */
+var _gdSel=null,_gdDone=0,_gdLocked=false;
+function baiGhepDoi(){
+  var pool=['🌸','⭐','🍎','🐱','🦋','🐝','🍊','🌈'];
+  var pairs=pool.slice(0,4);
+  var cards=pairs.concat(pairs).sort(function(){return Math.random()-.5;});
+  _gdSel=null;_gdDone=0;_gdLocked=false;
+  document.getElementById('gd-msg').textContent='';
+  document.getElementById('gd-board').innerHTML=cards.map(function(em,idx){
+    return '<div class="gd-card" id="gdc'+idx+'" onclick="tapGd('+idx+')">'+em+'</div>';
+  }).join('');
+  say('Mây hãy tìm 2 hình giống nhau và bấm vào nhé!');
+}
+function tapGd(idx){
+  if(_gdLocked) return;
+  var el=document.getElementById('gdc'+idx);
+  if(!el||el.classList.contains('ok')||el.classList.contains('sel')) return;
+  var em=el.textContent; // lấy emoji từ nội dung card
+  if(_gdSel===null){
+    _gdSel={idx:idx,em:em}; el.classList.add('sel');
+  } else {
+    _gdLocked=true;
+    var prev=document.getElementById('gdc'+_gdSel.idx);
+    if(_gdSel.em===em&&_gdSel.idx!==idx){
+      el.classList.add('ok'); if(prev){prev.classList.remove('sel');prev.classList.add('ok');}
+      _gdDone++; _gdSel=null; _gdLocked=false;
+      addXP(5);
+      if(_gdDone===4){document.getElementById('gd-msg').textContent='🎉 Tuyệt vời! Mây tìm hết rồi!';say('Tuyệt vời! Mây giỏi quá!');}
+      else{say('Đúng! Tìm tiếp nhé Mây!');}
+    } else {
+      el.classList.add('bad'); if(prev) prev.classList.add('bad');
+      setTimeout(function(){
+        el.classList.remove('bad','sel');
+        if(prev) prev.classList.remove('bad','sel');
+        _gdSel=null; _gdLocked=false;
+      },700);
+      say('Chưa đúng! Tìm lại nhé!');
+    }
+  }
+}
+
+/* ════════════════════ MÀU & HÌNH ════════════════════ */
+var _MH=[
+  {q:'Con vật nào có màu vàng?',opts:['🐘','🐝','🐸','🐬'],ans:1},
+  {q:'Quả nào có màu đỏ?',opts:['🍌','🍊','🍎','🍇'],ans:2},
+  {q:'Hình nào tròn?',opts:['🟥','⬛','🔵','🔺'],ans:2},
+  {q:'Con vật nào biết bay?',opts:['🐸','🐠','🦋','🐌'],ans:2},
+  {q:'Quả nào có màu vàng?',opts:['🍎','🍇','🍓','🍌'],ans:3},
+  {q:'Hình nào có màu xanh?',opts:['🟥','🟡','🔵','🟤'],ans:2},
+  {q:'Con vật nào kêu gâu gâu?',opts:['🐱','🐶','🐮','🐔'],ans:1},
+  {q:'Con vật nào sống dưới nước?',opts:['🐱','🦁','🐠','🐘'],ans:2},
+  {q:'Hoa nào màu hồng?',opts:['🌻','🌸','🌿','🌼'],ans:1},
+  {q:'Con vật nào to nhất?',opts:['🐝','🐸','🐱','🐘'],ans:3},
+  {q:'Quả nào có màu cam?',opts:['🍎','🍊','🍇','🍌'],ans:1},
+  {q:'Con nào có cánh?',opts:['🐢','🐌','🦋','🐸'],ans:2},
+  {q:'Màu nào là màu trời?',opts:['🔴','🟡','🔵','🟢'],ans:2},
+  {q:'Con nào hay kêu meo meo?',opts:['🐶','🐔','🐮','🐱'],ans:3},
+  {q:'Cái nào có thể ăn được?',opts:['🚗','🍎','📚','🪣'],ans:1},
+];
+function baiMauHinh(){
+  var q=_MH[Math.floor(Math.random()*_MH.length)];
+  document.getElementById('mh-cau').textContent=q.q;
+  document.getElementById('mh-opts').innerHTML=q.opts.map(function(o,i){
+    return '<div onclick="checkMH('+i+','+q.ans+')" id="mhopt'+i+'" style="font-size:46px;cursor:pointer;padding:10px 14px;border-radius:14px;border:2.5px solid var(--ice2);background:#fff;transition:all .12s;text-align:center;">'+o+'</div>';
+  }).join('');
+  document.getElementById('mh-msg').textContent='';
+  say(q.q);
+}
+function checkMH(i,correct){
+  document.querySelectorAll('[id^=mhopt]').forEach(function(b){b.style.pointerEvents='none';});
+  var el=document.getElementById('mhopt'+i);
+  if(i===correct){
+    el.style.borderColor='#9FE1CB';el.style.background='#EAF3DE';
+    document.getElementById('mh-msg').textContent='🎉 Đúng rồi! Mây giỏi!';
+    say('Đúng rồi! Mây thông minh!');addXP(5);
+    setTimeout(baiMauHinh,1600);
+  } else {
+    el.style.borderColor='#F7C1C1';el.style.background='#FCEBEB';
+    var ok=document.getElementById('mhopt'+correct);
+    if(ok){ok.style.borderColor='#9FE1CB';ok.style.background='#EAF3DE';}
+    document.getElementById('mh-msg').textContent='💛 Thử lại nhé!';
+    say('Chưa đúng! Nhìn kỹ lại nhé!');
+    setTimeout(baiMauHinh,1900);
+  }
+}
+
+/* ════════════════════ CANVAS TÔ MÀU (PHỐI MÀU) ════════════════════ */
+var _mixC=null,_mixCColor='#C5E3FF';
+function initMixCanvas(){
+  var cv=document.getElementById('mixC'); if(!cv||_mixC) return;
+  _mixC=cv.getContext('2d');
+  _mixC.fillStyle='#fff';_mixC.fillRect(0,0,340,160);
+  var draw=false;
+  function pos(e){var r=cv.getBoundingClientRect();var sx=cv.width/r.width,sy=cv.height/r.height;
+    var cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;
+    return{x:(cx-r.left)*sx,y:(cy-r.top)*sy};}
+  cv.onmousedown=cv.ontouchstart=function(e){e.preventDefault();draw=true;var p=pos(e);_mixC.beginPath();_mixC.moveTo(p.x,p.y);};
+  cv.onmousemove=cv.ontouchmove=function(e){e.preventDefault();if(!draw)return;var p=pos(e);
+    _mixC.lineTo(p.x,p.y);_mixC.strokeStyle=_mixCColor;_mixC.lineWidth=16;_mixC.lineCap='round';_mixC.stroke();};
+  cv.onmouseup=cv.ontouchend=function(){draw=false;};
+}
+function xoaMixC(){if(_mixC){_mixC.fillStyle='#fff';_mixC.fillRect(0,0,340,160);}}
+
+/* ════════════════════ SPEED PANEL ════════════════════ */
+var _origOP=openPanel;
+openPanel=function(which){
+  if(which==='speed'){
+    var box=document.getElementById('panel-content');if(!box)return;
+    document.getElementById('panel-overlay').style.display='flex';
+    box.innerHTML='<div style="font-size:17px;font-weight:800;color:var(--ice5);font-family:var(--ffs);margin-bottom:14px;">🔈 Tốc độ đọc</div>'
+      +'<div style="display:flex;flex-direction:column;gap:10px;">'
+      +[{v:0.45,lb:'🐢 Rất chậm',ds:'Cho bé mới học'},
+        {v:0.60,lb:'🐌 Chậm',ds:'Khuyên dùng ✓'},
+        {v:0.75,lb:'🚶 Vừa phải',ds:''},
+        {v:0.90,lb:'🏃 Nhanh',ds:''}].map(function(sp){
+        var on=Math.abs(_ttsRate-sp.v)<0.08;
+        return '<button onclick="setTtsRate('+sp.v+');closePanel();" style="background:'+(on?'var(--ice4)':'var(--ice1)')+';color:'+(on?'#fff':'var(--ice5)')+';border:1.5px solid '+(on?'var(--ice4)':'var(--ice2)')+';border-radius:12px;padding:12px 16px;text-align:left;cursor:pointer;font-family:var(--ffs);font-size:13px;font-weight:700;">'
+          +'<div>'+sp.lb+(on?' ✓':'')+'</div>'+(sp.ds?'<div style="font-size:10px;opacity:.7;margin-top:2px;">'+sp.ds+'</div>':'')+'</button>';
+      }).join('')+'</div>';
+  } else { _origOP(which); }
+};
 
 /* ════════════════════ KHỞI ĐỘNG ════════════════════ */
 buildNav();
