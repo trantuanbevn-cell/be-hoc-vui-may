@@ -421,13 +421,14 @@ function _enq(text,lang,flush){
   if(_q.length&&_q[_q.length-1].t===c)return;      // bỏ câu lặp giống hệt
   if(_q.length>=3)_q.splice(0,_q.length-2);        // hàng đợi tối đa 3 câu
   _q.push({t:c,l:lang});
+  if(geminiReady())geminiTTS(c,lang).catch(function(){}); // tải trước, phát ngay khi đến lượt
   _pump();
 }
 function _done(my){
   if(my!==undefined&&my!==_tok)return;
   if(_watchdog){clearTimeout(_watchdog);_watchdog=null;}
   _speaking=false;_setPlaying(false);
-  setTimeout(_pump,260);                            // nghỉ nhẹ giữa hai câu
+  setTimeout(_pump,120);                            // nghỉ rất nhẹ giữa hai câu
 }
 function _sysSpeakItem(it,my){
   if(!window.speechSynthesis){_done(my);return;}
@@ -445,14 +446,22 @@ function _pump(){
   var my=++_tok;
   _watchdog=setTimeout(function(){_done(my);},Math.min(30000,6000+it.t.length*120)); // chống kẹt
   if(geminiReady()){
-    geminiTTS(it.t,it.l).then(function(url){
-      if(my!==_tok)return;                          // đã bị dừng/thay thế
-      if(!_audioEl)_audioEl=new Audio();
-      _audioEl.onended=_audioEl.onerror=function(){_done(my);};
-      _audioEl.src=url;
-      _audioEl.play().catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
-    }).catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
+    geminiTTS(it.t,it.l)
+      .catch(function(){if(my===_tok)return geminiTTS(it.t,it.l);throw 0;}) // thử lại 1 lần
+      .then(function(url){
+        if(my!==_tok)return;                        // đã bị dừng/thay thế
+        if(!_audioEl)_audioEl=new Audio();
+        _audioEl.onended=_audioEl.onerror=function(){_done(my);};
+        _audioEl.src=url;
+        _audioEl.play().catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
+      }).catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
   } else _sysSpeakItem(it,my);
+}
+function ttsPrefetch(t,lang){var c=_clean(t);if(c&&geminiReady())geminiTTS(c,lang||'vi').catch(function(){});}
+function warmTTS(){
+  PRAISE.concat(RETRY).forEach(function(t){ttsPrefetch(t);});
+  ttsPrefetch('Không sao đâu! Đáp án đúng là đây nè.');
+  ttsPrefetch('Giải lao chút nào! Bé uống ngụm nước, vươn vai rồi mình học tiếp nhé!');
 }
 function say(t){_enq(t,'vi',false);}
 function sayEn(t){_enq(t,'en',false);}
@@ -861,7 +870,7 @@ function renderQuest(){
   renderBeh();
 }
 function startQuest(){
-  ensureDay();
+  ensureDay();warmTTS();
   document.querySelectorAll('.scr').forEach(function(x){x.classList.remove('on');});
   $('s-quest').classList.add('on');
   window.scrollTo(0,0);
@@ -916,8 +925,8 @@ function qOpts(list,correct,fmt,explain,col,enPraise){
         el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;if(x!==b)x.classList.add('dim');});
         b.classList.add('ok');$('qq-msg').textContent='🎉 Đúng rồi!';
         addXu(1,'Trả lời đúng');
-        if(enPraise){sayEnNow(enPraise);}else{sayNow(praise()+(explain?' '+explain:''));}
-        setTimeout(qNext,1900);
+        if(enPraise){sayEnNow(enPraise);}else{sayNow(praise());if(explain)say(explain);}
+        setTimeout(qNext,1500);
       } else {
         b.classList.add('bad');b.onclick=null;setTimeout(function(){b.classList.add('dim');},350);
         _qWrong++;
@@ -925,8 +934,8 @@ function qOpts(list,correct,fmt,explain,col,enPraise){
           el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;
             if(String(x.getAttribute('data-v'))===String(correct))x.classList.add('ok');else x.classList.add('dim');});
           $('qq-msg').textContent='💙 Đáp án đúng đây nè, không sao nhé!';
-          sayNow('Không sao đâu! Đáp án đúng là đây nè. '+(explain||'')+' Mình sang câu tiếp nhé!');
-          setTimeout(qNext,2800);
+          sayNow('Không sao đâu! Đáp án đúng là đây nè.');say((explain||'')+' Mình sang câu tiếp nhé!');
+          setTimeout(qNext,2400);
         } else {$('qq-msg').textContent='💛 Thử lại nhé Mây!';sayNow(retry());}
       }
     };
@@ -1294,7 +1303,7 @@ function monTab(i){
 var MODULES={};
 function box(t,inner){return '<div class="mbox">'+(t?'<div class="mbox-t">'+t+'</div>':'')+inner+'</div>';}
 function dotHtml(n,cls){var h='';for(var i=0;i<n;i++)h+='<div class="dot '+(cls||'')+'"></div>';return h;}
-function onOk(sub,extra){sayNow(praise()+(extra?' '+extra:''));misProgress(sub);}
+function onOk(sub,extra){sayNow(praise());if(extra)say(extra);misProgress(sub);}
 function setupDraw(canvas,color){
   var ctx=canvas.getContext('2d'),drawing=false;
   function pos(e){var r=canvas.getBoundingClientRect(),sx=canvas.width/r.width,sy=canvas.height/r.height;
@@ -2536,7 +2545,7 @@ function saveSettings(){
   CFG.voice=$('st-voice').value;
   CFG.useGemini=$('st-usegem').checked;
   saveCFG();
-  _ttsCache={};_ttsCacheKeys=[];
+  _ttsCache={};_ttsCacheKeys=[];warmTTS();
   $('st-msg').textContent='';
   closePanel();
   sayNow('Đã lưu cài đặt rồi nhé!');
@@ -2590,6 +2599,7 @@ var _splashHidden=false;
 function hideSplash(){
   if(_splashHidden)return;_splashHidden=true;
   unlockAudio();
+  warmTTS();ttsPrefetch(homeGreeting());
   var sp=$('splash');sp.classList.add('hide');
   setTimeout(function(){
     sp.remove();$('app').style.display='block';
