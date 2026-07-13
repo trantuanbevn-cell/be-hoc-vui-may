@@ -364,15 +364,18 @@ function pcmToWavUrl(b64){
   return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
 }
 function geminiReady(){return !!(CFG.apiKey&&CFG.useGemini&&navigator.onLine);}
-function _ttsCachePut(k,url){
-  _ttsCache[k]=url;_ttsCacheKeys.push(k);
-  if(_ttsCacheKeys.length>120){var old=_ttsCacheKeys.shift();try{URL.revokeObjectURL(_ttsCache[old]);}catch(e){}delete _ttsCache[old];}
+function _ttsCachePut(k,p){
+  _ttsCache[k]=p;_ttsCacheKeys.push(k);
+  if(_ttsCacheKeys.length>120){
+    var old=_ttsCacheKeys.shift(),op=_ttsCache[old];delete _ttsCache[old];
+    if(op&&op.then)op.then(function(u){try{URL.revokeObjectURL(u);}catch(e){}},function(){});
+  }
 }
 function geminiTTS(text,lang){
   var style=lang==='en'?'Speak at a natural, normal pace with a gentle, warm and loving female voice, like a kind teacher chatting with a young child: ':'Nói với tốc độ tự nhiên bình thường, giọng nữ nhẹ nhàng, tình cảm, ấm áp như đang trò chuyện với bé: ';
   var key=lang+'|'+text;
-  if(_ttsCache[key])return Promise.resolve(_ttsCache[key]);
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key='+encodeURIComponent(CFG.apiKey),{
+  if(_ttsCache[key])return _ttsCache[key];   // đang tải hoặc đã có → dùng chung, KHÔNG gọi lại
+  var p=fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key='+encodeURIComponent(CFG.apiKey),{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       contents:[{parts:[{text:style+text}]}],
@@ -382,8 +385,11 @@ function geminiTTS(text,lang){
     .then(function(j){
       var d=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts&&j.candidates[0].content.parts[0]&&j.candidates[0].content.parts[0].inlineData;
       if(!d||!d.data)throw new Error('tts empty');
-      var url=pcmToWavUrl(d.data);_ttsCachePut(key,url);return url;
+      return pcmToWavUrl(d.data);
     });
+  var guarded=p.catch(function(e){delete _ttsCache[key];throw e;}); // lỗi thì bỏ khỏi cache để lần sau thử lại
+  _ttsCachePut(key,guarded);
+  return guarded;
 }
 /* ── fallback Web Speech ── */
 var _viVoice=null,_enVoice=null;
@@ -432,6 +438,8 @@ function _done(my){
 }
 function _sysSpeakItem(it,my){
   if(!window.speechSynthesis){_done(my);return;}
+  if(_watchdog){clearTimeout(_watchdog);}
+  _watchdog=setTimeout(function(){_done(my);},45000);
   var u=new SpeechSynthesisUtterance(it.t);
   if(it.l==='en'){u.lang='en-US';u.rate=0.95;u.pitch=1.05;if(_enVoice)u.voice=_enVoice;}
   else{u.lang='vi-VN';u.rate=CFG.rate;u.pitch=1.05;if(_viVoice)u.voice=_viVoice;}
@@ -444,12 +452,14 @@ function _pump(){
   var it=_q.shift();
   _speaking=true;_setPlaying(true);
   var my=++_tok;
-  _watchdog=setTimeout(function(){_done(my);},Math.min(30000,6000+it.t.length*120)); // chống kẹt
+  _watchdog=setTimeout(function(){_done(my);},12000); // canh giai đoạn tải giọng, tối đa 12s
   if(geminiReady()){
     geminiTTS(it.t,it.l)
-      .catch(function(){if(my===_tok)return geminiTTS(it.t,it.l);throw 0;}) // thử lại 1 lần
+      .catch(function(){if(my===_tok)return geminiTTS(it.t,it.l);throw 0;}) // lỗi thoáng qua: thử lại 1 lần
       .then(function(url){
         if(my!==_tok)return;                        // đã bị dừng/thay thế
+        if(_watchdog){clearTimeout(_watchdog);}
+        _watchdog=setTimeout(function(){_done(my);},60000); // bảo hiểm hiếm gặp, KHÔNG cắt giữa câu
         if(!_audioEl)_audioEl=new Audio();
         _audioEl.onended=_audioEl.onerror=function(){_done(my);};
         _audioEl.src=url;
@@ -458,10 +468,18 @@ function _pump(){
   } else _sysSpeakItem(it,my);
 }
 function ttsPrefetch(t,lang){var c=_clean(t);if(c&&geminiReady())geminiTTS(c,lang||'vi').catch(function(){});}
+var _warming=false;
 function warmTTS(){
-  PRAISE.concat(RETRY).forEach(function(t){ttsPrefetch(t);});
-  ttsPrefetch('Không sao đâu! Đáp án đúng là đây nè.');
-  ttsPrefetch('Giải lao chút nào! Bé uống ngụm nước, vươn vai rồi mình học tiếp nhé!');
+  if(_warming||!geminiReady())return;
+  _warming=true;
+  var list=PRAISE.concat(RETRY,['Không sao đâu! Đáp án đúng là đây nè.']);
+  var i=0;
+  (function next(){
+    if(i>=list.length){_warming=false;return;}
+    var c=_clean(list[i++]);
+    if(_ttsCache['vi|'+c]){next();return;}
+    geminiTTS(c,'vi').catch(function(){}).then(function(){setTimeout(next,1000);},function(){setTimeout(next,1000);});
+  })();
 }
 function say(t){_enq(t,'vi',false);}
 function sayEn(t){_enq(t,'en',false);}
