@@ -899,6 +899,12 @@ function questPlan(){
 function ensureDay(){
   var t=todayStr();
   if(!S.quest||S.quest.day!==t)S.quest={day:t,plan:questPlan(),idx:0,done:false,rewardTaken:false};
+  /* nâng cấp app giữa ngày: kế hoạch cũ (15/21/28/35/42 câu) → thay bằng kế hoạch mới, giữ nguyên tiến độ đã làm */
+  if(!S.quest.done&&[15,21,28,35,42].indexOf(S.quest.plan.length)>=0){
+    var np=questPlan();
+    S.quest.plan=np;
+    S.quest.idx=Math.min(S.quest.idx,np.length);
+  }
   if(!S.beh||S.beh.day!==t)S.beh={day:t,done:{}};
   saveS();
 }
