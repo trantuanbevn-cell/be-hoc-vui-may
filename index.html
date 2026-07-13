@@ -287,6 +287,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:10p
     <div class="subj" onclick="openPanel('cat')"><span class="se">🐱</span><span class="sl">Mèo Bông</span><div class="sd">chăm sóc thú cưng</div></div>
     <div class="subj" onclick="openPanel('badges')"><span class="se">🏅</span><span class="sl">Huy hiệu</span><div class="sd">thành tích của Mây</div></div>
     <div class="subj" onclick="openPanel('history')"><span class="se">📒</span><span class="sl">Sổ xu</span><div class="sd">lịch sử xu ra vào</div></div>
+    <div class="subj" onclick="askPin(function(){openPanel('report')})"><span class="se">📊</span><span class="sl">Học bạ của bé</span><div class="sd">dành cho ba mẹ 🔐</div></div>
   </div>
 </div>
 </div><!-- /app -->
@@ -319,7 +320,8 @@ var S=(function(){try{var s=JSON.parse(localStorage.getItem(ME_KEY));if(s&&typeo
 function saveS(){try{localStorage.setItem(ME_KEY,JSON.stringify(S));}catch(e){}}
 var CFG=(function(){try{return JSON.parse(localStorage.getItem('mayelsa_cfg'))||{};}catch(e){return{};}})();
 function saveCFG(){try{localStorage.setItem('mayelsa_cfg',JSON.stringify(CFG));}catch(e){}}
-CFG.pin=CFG.pin||'1234';
+CFG.pin=CFG.pin||'280510';
+if(CFG.pin==='1234')CFG.pin='280510'; // nâng cấp PIN mặc định cũ
 CFG.rate=CFG.rate||1.0;
 if(CFG.rate<0.7)CFG.rate=1.0; // bỏ tốc độ quá chậm cũ
 CFG.voice=CFG.voice||'Leda';
@@ -363,7 +365,8 @@ function pcmToWavUrl(b64){
   for(var i=0;i<n;i++)v.setUint8(44+i,bin.charCodeAt(i));
   return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
 }
-function geminiReady(){return !!(CFG.apiKey&&CFG.useGemini&&navigator.onLine);}
+var _gemFailUntil=0;
+function geminiReady(){return !!(CFG.apiKey&&CFG.useGemini&&navigator.onLine&&Date.now()>=_gemFailUntil);}
 function _ttsCachePut(k,p){
   _ttsCache[k]=p;_ttsCacheKeys.push(k);
   if(_ttsCacheKeys.length>120){
@@ -420,7 +423,14 @@ function _stopCurrent(){
   if(_audioEl){_audioEl.onended=_audioEl.onerror=null;try{_audioEl.pause();_audioEl.currentTime=0;}catch(e){}}
   _setPlaying(false);
 }
-function sayStop(){_q=[];_stopCurrent();}
+var _idleCb=null;
+function sayStop(){_q=[];_idleCb=null;_stopCurrent();}
+/* Gọi cb khi ĐỌC XONG HẾT (hàng đợi trống + không còn tiếng); maxMs = bảo hiểm */
+function whenQuiet(cb,maxMs){
+  if(!_speaking&&!_q.length){cb();return;}
+  _idleCb=cb;
+  setTimeout(function(){if(_idleCb===cb){_idleCb=null;cb();}},maxMs||15000);
+}
 function _enq(text,lang,flush){
   var c=_clean(text);if(!c)return;
   if(flush)sayStop();
@@ -434,10 +444,12 @@ function _done(my){
   if(my!==undefined&&my!==_tok)return;
   if(_watchdog){clearTimeout(_watchdog);_watchdog=null;}
   _speaking=false;_setPlaying(false);
+  if(!_q.length&&_idleCb){var cb=_idleCb;_idleCb=null;setTimeout(cb,60);}
   setTimeout(_pump,120);                            // nghỉ rất nhẹ giữa hai câu
 }
 function _sysSpeakItem(it,my){
   if(!window.speechSynthesis){_done(my);return;}
+  if(!_viVoice||!_enVoice)_applyVoices(); // chốt đúng 1 giọng hệ thống
   if(_watchdog){clearTimeout(_watchdog);}
   _watchdog=setTimeout(function(){_done(my);},45000);
   var u=new SpeechSynthesisUtterance(it.t);
@@ -464,7 +476,10 @@ function _pump(){
         _audioEl.onended=_audioEl.onerror=function(){_done(my);};
         _audioEl.src=url;
         _audioEl.play().catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
-      }).catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
+      }).catch(function(){
+        _gemFailUntil=Date.now()+120000; // Gemini nghẽn → dùng ổn định 1 giọng máy 2 phút, không lẫn lộn
+        if(my===_tok)_sysSpeakItem(it,my);
+      });
   } else _sysSpeakItem(it,my);
 }
 function ttsPrefetch(t,lang){var c=_clean(t);if(c&&geminiReady())geminiTTS(c,lang||'vi').catch(function(){});}
@@ -472,13 +487,13 @@ var _warming=false;
 function warmTTS(){
   if(_warming||!geminiReady())return;
   _warming=true;
-  var list=PRAISE.concat(RETRY,['Không sao đâu! Đáp án đúng là đây nè.']);
+  var list=[PRAISE[0],RETRY[0],'Không sao đâu! Đáp án đúng là đây nè.'];
   var i=0;
   (function next(){
     if(i>=list.length){_warming=false;return;}
     var c=_clean(list[i++]);
     if(_ttsCache['vi|'+c]){next();return;}
-    geminiTTS(c,'vi').catch(function(){}).then(function(){setTimeout(next,1000);},function(){setTimeout(next,1000);});
+    geminiTTS(c,'vi').then(function(){setTimeout(next,2000);},function(){_warming=false;});
   })();
 }
 function say(t){_enq(t,'vi',false);}
@@ -531,8 +546,15 @@ function mkOpts(elId,options,correct,onDone,fmt){
 }
 var PRAISE=['Đúng rồi! Mây Elsa giỏi quá!','Chính xác! Bé thông minh ghê!','Tuyệt vời! Đúng rồi đó Mây!','Hoan hô! Mây Elsa siêu quá!','Quá đỉnh! Đúng rồi nè!'];
 var RETRY=['Chưa đúng rồi, thử lại nhé Mây!','Gần đúng rồi! Bé nhìn kỹ lại nha!','Ôi chưa phải, Mây thử lần nữa nè!'];
-function praise(){return pick(PRAISE);}
-function retry(){return pick(RETRY);}
+function _pickCached(arr){
+  if(geminiReady()){
+    var có=arr.filter(function(t){return _ttsCache['vi|'+_clean(t)];});
+    if(có.length&&Math.random()<0.85)return pick(có); // ưu tiên câu đã có giọng sẵn
+  }
+  return pick(arr);
+}
+function praise(){return _pickCached(PRAISE);}
+function retry(){return _pickCached(RETRY);}
 /* ════════════════════════════════════════════════════════
    HỌC LIỆU — đã rà soát: mọi ví dụ đúng âm đầu, mọi từ là từ thật
 ════════════════════════════════════════════════════════ */
@@ -818,40 +840,46 @@ function updateXuUI(){
 ════════════════════════════════════════════════════════ */
 var SUB_META={toan:['🔢','Toán'],chu:['🔤','Chữ cái'],en:['🇬🇧','English'],logic:['🧩','Tư duy'],hinh:['🔷','Hình học'],kns:['🌟','Bé ngoan'],kh:['🔬','Khoa học'],gio:['⏰','Giờ & lịch']};
 /* ── Thời lượng tăng dần theo buổi: 1-10: ~15ph · 11-20: ~20ph · 21-30: ~25ph · 31+: ~30ph ── */
-var TIERS=[{mins:15,bonus:25},{mins:20,bonus:30},{mins:25,bonus:35},{mins:30,bonus:40}];
+var TIERS=[{mins:20,bonus:25},{mins:25,bonus:30},{mins:25,bonus:35},{mins:30,bonus:40}];
 var TIER_SIZES=[
-  {toan:5,chu:5,en:4,lh:4,extra:3,both:false},  /* 21 câu ≈ 15 phút */
-  {toan:6,chu:6,en:5,lh:4,extra:3,both:true},   /* 28 câu ≈ 20 phút */
-  {toan:8,chu:7,en:6,lh:5,extra:4,both:true},   /* 35 câu ≈ 25 phút */
-  {toan:9,chu:8,en:7,lh:6,extra:6,both:true}    /* 42 câu ≈ 30 phút */
+  {toan:10,chu:10,en:10,lh:10,extra:10,both:false}, /* buổi 1-10: 5 môn × 10 câu = 50 câu */
+  {toan:10,chu:10,en:10,lh:10,extra:10,both:true},  /* buổi 11-20: thêm cả logic + hình = 60 câu */
+  {toan:10,chu:10,en:10,lh:10,extra:10,both:true},  /* buổi 21-30: 60 câu */
+  {toan:10,chu:10,en:10,lh:10,extra:14,both:true}   /* buổi 31+: 2 môn phụ = 64 câu */
 ];
 function sesTier(){return Math.min(3,Math.floor((S.sesCount||0)/10));}
+var SUBJ_POOLS={toan:['dem','find','tinh','ss','lien'],chu:['fc','hl','cd','tone'],en:['ea','el','num'],logic:['seq','odd','size'],hinh:['shape','real','spa'],kns:['kns','emo'],kh:['kh'],gio:['clock','buoi']};
+function typeAcc(t){var r=S.skill&&S.skill.t&&S.skill.t[t];return (r&&r.n>=4)?(r.s/r.n):null;}
+function subAcc(sub){var r=S.skill&&S.skill.s&&S.skill.s[sub];return (r&&r.n>=12)?(r.s/r.n):null;}
 function questPlan(){
   var d0=new Date(),s=d0.getFullYear()*10000+(d0.getMonth()+1)*100+d0.getDate();
   var lcg=function(){s=(s*1103515245+12345)%2147483648;return s/2147483648;};
   function mix(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(lcg()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
-  function types(pool,n){var a=mix(pool),o=[];for(var i=0;i<n;i++)o.push(a[i%a.length]);return o;}
+  /* mỗi dạng ít nhất 1 câu; các suất còn lại dồn cho 2 dạng bé yếu nhất */
+  function typesAdaptive(pool,n){
+    var out=mix(pool).slice(0,Math.min(n,pool.length));
+    var sorted=pool.slice().sort(function(a,b){
+      var x=typeAcc(a),y=typeAcc(b);
+      return (x===null?0.7:x)-(y===null?0.7:y);
+    });
+    var k=0;
+    while(out.length<n){out.push(sorted[k%Math.min(2,sorted.length)]);k++;}
+    return mix(out);
+  }
   var d=d0.getDay(),sz=TIER_SIZES[sesTier()],plan=[];
-  types(['dem','find','tinh','ss','lien'],sz.toan).forEach(function(t){plan.push({sub:'toan',t:t});});
-  types(['fc','hl','cd','tone'],sz.chu).forEach(function(t){plan.push({sub:'chu',t:t});});
-  types(['ea','el','num'],sz.en).forEach(function(t){plan.push({sub:'en',t:t});});
-  var lg=types(['seq','odd','size'],sz.lh),hi=types(['shape','real','spa'],sz.lh);
-  if(sz.both){
-    var pair=d%2===0?[['logic',lg],['hinh',hi]]:[['hinh',hi],['logic',lg]];
-    pair.forEach(function(p){p[1].forEach(function(t){plan.push({sub:p[0],t:t});});});
-  } else {
-    var one=d%2===0?['logic',lg]:['hinh',hi];
-    one[1].forEach(function(t){plan.push({sub:one[0],t:t});});
-  }
-  var pools={kns:['kns','emo'],kh:['kh'],gio:['clock','buoi']};
+  function block(sub,n){typesAdaptive(SUBJ_POOLS[sub],n).forEach(function(t){plan.push({sub:sub,t:t});});}
+  block('toan',sz.toan);block('chu',sz.chu);block('en',sz.en);
+  if(sz.both){var pair=d%2===0?['logic','hinh']:['hinh','logic'];block(pair[0],sz.lh);block(pair[1],sz.lh);}
+  else block(d%2===0?'logic':'hinh',sz.lh);
   var order=['kns','kh','gio'],e1=order[d%3];
-  if(sz.extra<=4){
-    types(pools[e1],sz.extra).forEach(function(t){plan.push({sub:e1,t:t});});
-  } else {
-    var e2=order[(d+1)%3];
-    types(pools[e1],3).forEach(function(t){plan.push({sub:e1,t:t});});
-    types(pools[e2],sz.extra-3).forEach(function(t){plan.push({sub:e2,t:t});});
-  }
+  if(sz.extra<=10){block(e1,sz.extra);}
+  else{var e2=order[(d+1)%3];block(e1,Math.ceil(sz.extra/2));block(e2,Math.floor(sz.extra/2));}
+  /* môn chính yếu nhất (dưới 65% khi đã đủ dữ liệu) → luyện thêm 5 câu */
+  var weak=null,wa=0.65;
+  ['toan','chu','en','logic','hinh'].forEach(function(sub){
+    var a=subAcc(sub);if(a!==null&&a<wa){wa=a;weak=sub;}
+  });
+  if(weak)typesAdaptive(SUBJ_POOLS[weak],5).forEach(function(t){plan.push({sub:weak,t:t,lt:true});});
   return plan;
 }
 function ensureDay(){
@@ -888,7 +916,7 @@ function renderQuest(){
   renderBeh();
 }
 function startQuest(){
-  ensureDay();warmTTS();
+  ensureDay();
   document.querySelectorAll('.scr').forEach(function(x){x.classList.remove('on');});
   $('s-quest').classList.add('on');
   window.scrollTo(0,0);
@@ -897,6 +925,18 @@ function startQuest(){
 }
 function quitQuest(){sayStop();go('home');}
 var _qWrong=0,_qRepeat=null;
+function skillRec(res){
+  var it=S.quest&&S.quest.plan&&S.quest.plan[S.quest.idx];if(!it)return;
+  S.skill=S.skill||{t:{},s:{},days:{}};
+  function bump(o,k){o[k]=o[k]||{n:0,s:0};o[k].n++;o[k].s+=res;}
+  bump(S.skill.t,it.t);bump(S.skill.s,it.sub);
+  var d=todayStr();
+  S.skill.days[d]=S.skill.days[d]||{n:0,s:0};
+  S.skill.days[d].n++;S.skill.days[d].s+=res;
+  var ks=Object.keys(S.skill.days);
+  while(ks.length>30){delete S.skill.days[ks.shift()];}
+  saveS();
+}
 function renderQuestStep(skipTrans){
   var qp=S.quest;
   if(qp.idx>=qp.plan.length){finishQuest();return;}
@@ -942,18 +982,20 @@ function qOpts(list,correct,fmt,explain,col,enPraise){
       if(ok){
         el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;if(x!==b)x.classList.add('dim');});
         b.classList.add('ok');$('qq-msg').textContent='🎉 Đúng rồi!';
+        skillRec(_qWrong===0?1:0.5);
         addXu(1,'Trả lời đúng');
         if(enPraise){sayEnNow(enPraise);}else{sayNow(praise());if(explain)say(explain);}
-        setTimeout(qNext,1500);
+        whenQuiet(function(){setTimeout(qNext,300);},18000); // nghe hết nhận xét rồi mới sang câu mới
       } else {
         b.classList.add('bad');b.onclick=null;setTimeout(function(){b.classList.add('dim');},350);
         _qWrong++;
         if(_qWrong>=3){
           el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;
             if(String(x.getAttribute('data-v'))===String(correct))x.classList.add('ok');else x.classList.add('dim');});
+          skillRec(0);
           $('qq-msg').textContent='💙 Đáp án đúng đây nè, không sao nhé!';
           sayNow('Không sao đâu! Đáp án đúng là đây nè.');say((explain||'')+' Mình sang câu tiếp nhé!');
-          setTimeout(qNext,2400);
+          whenQuiet(function(){setTimeout(qNext,300);},20000);
         } else {$('qq-msg').textContent='💛 Thử lại nhé Mây!';sayNow(retry());}
       }
     };
@@ -2355,7 +2397,8 @@ function toggleMic(){
 function openPanel(which){
   var box=$('panel-content');if(!box)return;
   $('panel-overlay').style.display='flex';
-  if(which==='shop')renderShop(box);
+  if(which==='report')renderReport(box);
+  else if(which==='shop')renderShop(box);
   else if(which==='cat')renderCat(box);
   else if(which==='badges')renderBadges(box);
   else if(which==='history')renderHistory(box);
@@ -2438,6 +2481,58 @@ function renderHistory(box){
       +'<div class="sr-info"><div class="sr-name">'+r.lb+'</div><div class="sr-desc">'+r.ds+' · '+r.time+'</div></div>'
       +'<div style="font-weight:800;color:'+(r.t==='earn'?'var(--ok)':'var(--bad)')+';">'+(r.t==='earn'?'+':'−')+r.amt+'</div></div>';
   });
+  box.innerHTML=h;
+}
+var TYPE_LB={dem:'Đếm số lượng',find:'Nhận mặt số',tinh:'Phép cộng',ss:'So sánh nhiều – ít',lien:'Số liền kề',fc:'Nhận mặt chữ',hl:'Chữ hoa – thường',cd:'Âm đầu của từ',tone:'Dấu thanh',ea:'Chữ cái tiếng Anh',el:'Nghe hiểu từ vựng Anh',num:'Đếm bằng tiếng Anh',seq:'Quy luật dãy hình',odd:'Tìm khác loại',size:'So sánh đặc điểm',shape:'Hình phẳng',real:'Hình trong đời sống',spa:'Vị trí không gian',kns:'Tình huống bé ngoan',emo:'Nhận biết cảm xúc',kh:'Hiểu biết khoa học',clock:'Xem giờ đồng hồ',buoi:'Các buổi trong ngày'};
+function _accColor(a){return a>=0.8?'#38B26E':a>=0.6?'#E8A93C':'#E05B5B';}
+function renderReport(box){
+  var sk=S.skill||{t:{},s:{},days:{}};
+  var totN=0,totS=0;
+  Object.keys(sk.s||{}).forEach(function(k){totN+=sk.s[k].n;totS+=sk.s[k].s;});
+  var h='<div style="font-size:19px;font-weight:800;color:var(--pk6);margin-bottom:4px;">📊 Học bạ của Mây Elsa</div>'
+    +'<div style="font-size:12px;color:#A08CA6;font-family:var(--ffs);font-weight:700;margin-bottom:12px;">Điểm mỗi câu: đúng ngay 100% · đúng sau vài lần thử 50% · cần xem đáp án 0%</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;text-align:center;">'
+    +[['📚',S.sesCount||0,'buổi học'],['🔥',S.streak||0,'ngày liền'],['✏️',totN,'câu đã làm'],['🎯',totN?Math.round(totS/totN*100)+'%':'—','độ chính xác']].map(function(x){
+      return '<div style="background:var(--ic0);border-radius:14px;padding:10px 4px;"><div style="font-size:20px;">'+x[0]+'</div><div style="font-size:17px;font-weight:800;color:var(--pk6);">'+x[1]+'</div><div style="font-size:10px;color:#A08CA6;font-family:var(--ffs);font-weight:700;">'+x[2]+'</div></div>';}).join('')+'</div>';
+  if(!totN){
+    h+='<div style="text-align:center;color:#A08CA6;font-family:var(--ffs);font-weight:700;padding:20px;">Chưa có dữ liệu. Bé làm nhiệm vụ đầu tiên là học bạ bắt đầu ghi nhé!</div>';
+    box.innerHTML=h;return;
+  }
+  h+='<div class="set-lb">🎓 Năng lực theo môn</div>';
+  Object.keys(SUB_META).forEach(function(sub){
+    var r=sk.s[sub];if(!r||!r.n)return;
+    var a=r.s/r.n,pct=Math.round(a*100);
+    var tag=a>=0.8?'💪 Mạnh':a>=0.6?'🙂 Ổn':'🌱 Cần luyện';
+    h+='<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;color:var(--pk6);font-family:var(--ffs);"><span>'+SUB_META[sub][0]+' '+SUB_META[sub][1]+' <span style="color:#A08CA6;font-weight:600;">('+r.n+' câu)</span></span><span style="color:'+_accColor(a)+';">'+pct+'% · '+tag+'</span></div>'
+      +'<div style="height:13px;background:#F4E7F0;border-radius:8px;overflow:hidden;margin-top:3px;"><div style="height:100%;width:'+pct+'%;border-radius:8px;background:'+_accColor(a)+';transition:width .4s;"></div></div></div>';
+  });
+  var types=Object.keys(sk.t).filter(function(t){return sk.t[t].n>=4;})
+    .map(function(t){return {t:t,a:sk.t[t].s/sk.t[t].n,n:sk.t[t].n};})
+    .sort(function(x,y){return x.a-y.a;});
+  var weak=types.filter(function(x){return x.a<0.75;}).slice(0,4);
+  var strong=types.filter(function(x){return x.a>=0.85;}).slice(-3).reverse();
+  if(weak.length){
+    h+='<div class="set-lb">🌱 Dạng bài cần luyện thêm</div>';
+    weak.forEach(function(x){h+='<div class="shop-row"><div class="sr-ico">🎯</div><div class="sr-info"><div class="sr-name">'+(TYPE_LB[x.t]||x.t)+'</div><div class="sr-desc">'+x.n+' câu đã làm</div></div><div style="font-weight:800;color:'+_accColor(x.a)+';">'+Math.round(x.a*100)+'%</div></div>';});
+    h+='<div style="font-size:11.5px;color:var(--ic5);font-family:var(--ffs);font-weight:700;background:var(--ic0);border-radius:12px;padding:10px 12px;margin-top:4px;">🤖 App đã tự động giao thêm các dạng bài này trong nhiệm vụ mỗi ngày của bé.</div>';
+  }
+  if(strong.length){
+    h+='<div class="set-lb">💪 Dạng bài bé làm tốt</div>';
+    strong.forEach(function(x){h+='<div class="shop-row"><div class="sr-ico">⭐</div><div class="sr-info"><div class="sr-name">'+(TYPE_LB[x.t]||x.t)+'</div><div class="sr-desc">'+x.n+' câu đã làm</div></div><div style="font-weight:800;color:'+_accColor(x.a)+';">'+Math.round(x.a*100)+'%</div></div>';});
+  }
+  h+='<div class="set-lb">🗓️ Hoạt động 7 ngày gần nhất</div><div style="display:flex;gap:6px;align-items:flex-end;height:90px;padding:4px 2px;">';
+  var maxN=1,cols=[];
+  for(var i=6;i>=0;i--){
+    var dd=new Date(Date.now()-i*86400000),key=dd.toDateString();
+    var v=(sk.days[key]||{n:0}).n;maxN=Math.max(maxN,v);
+    cols.push({lb:i===0?'H.nay':(dd.getDate()+'/'+(dd.getMonth()+1)),v:v});
+  }
+  cols.forEach(function(c){
+    h+='<div style="flex:1;text-align:center;"><div style="font-size:10px;font-weight:800;color:var(--pk5);font-family:var(--ffs);">'+(c.v||'')+'</div>'
+      +'<div style="height:'+Math.max(4,c.v/maxN*58)+'px;background:linear-gradient(180deg,var(--pk3),var(--pk4));border-radius:6px 6px 3px 3px;margin:2px 4px;"></div>'
+      +'<div style="font-size:9px;color:#A08CA6;font-family:var(--ffs);font-weight:700;">'+c.lb+'</div></div>';
+  });
+  h+='</div>';
   box.innerHTML=h;
 }
 /* ── MÈO BÔNG ── */
@@ -2563,7 +2658,7 @@ function saveSettings(){
   CFG.voice=$('st-voice').value;
   CFG.useGemini=$('st-usegem').checked;
   saveCFG();
-  _ttsCache={};_ttsCacheKeys=[];warmTTS();
+  _ttsCache={};_ttsCacheKeys=[];
   $('st-msg').textContent='';
   closePanel();
   sayNow('Đã lưu cài đặt rồi nhé!');
