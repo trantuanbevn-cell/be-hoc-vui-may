@@ -431,17 +431,30 @@ function whenQuiet(cb,maxMs){
   _idleCb=cb;
   setTimeout(function(){if(_idleCb===cb){_idleCb=null;cb();}},maxMs||15000);
 }
+function _chunks(c){
+  if(c.length<=230)return [c];
+  var parts=c.match(/[^.!?…]+[.!?…]*/g)||[c],out=[],cur='';
+  parts.forEach(function(p){
+    if((cur+p).length>200&&cur){out.push(cur.trim());cur=p;}
+    else cur+=p;
+  });
+  if(cur.trim())out.push(cur.trim());
+  return out;
+}
 function _enq(text,lang,flush){
   var c=_clean(text);if(!c)return;
   if(flush)sayStop();
-  if(_q.length&&_q[_q.length-1].t===c)return;      // bỏ câu lặp giống hệt
-  if(_q.length>=3)_q.splice(0,_q.length-2);        // hàng đợi tối đa 3 câu
-  _q.push({t:c,l:lang});
-  if(geminiReady())geminiTTS(c,lang).catch(function(){}); // tải trước, phát ngay khi đến lượt
+  _chunks(c).forEach(function(ck){
+    if(_q.length&&_q[_q.length-1].t===ck)return;   // bỏ câu lặp giống hệt
+    if(_q.length>=10)_q.splice(0,_q.length-9);     // hàng đợi tối đa 10 đoạn
+    _q.push({t:ck,l:lang});
+    if(geminiReady())geminiTTS(ck,lang).catch(function(){}); // tải trước
+  });
   _pump();
 }
 function _done(my){
   if(my!==undefined&&my!==_tok)return;
+  _tok++; // vô hiệu mọi phiên tải cũ còn lơ lửng
   if(_watchdog){clearTimeout(_watchdog);_watchdog=null;}
   _speaking=false;_setPlaying(false);
   if(!_q.length&&_idleCb){var cb=_idleCb;_idleCb=null;setTimeout(cb,60);}
@@ -464,7 +477,7 @@ function _pump(){
   var it=_q.shift();
   _speaking=true;_setPlaying(true);
   var my=++_tok;
-  _watchdog=setTimeout(function(){_done(my);},12000); // canh giai đoạn tải giọng, tối đa 12s
+  _watchdog=setTimeout(function(){_done(my);},Math.min(30000,9000+it.t.length*25)); // canh giai đoạn tải giọng
   if(geminiReady()){
     geminiTTS(it.t,it.l)
       .catch(function(){if(my===_tok)return geminiTTS(it.t,it.l);throw 0;}) // lỗi thoáng qua: thử lại 1 lần
@@ -478,6 +491,7 @@ function _pump(){
         _audioEl.play().catch(function(){if(my===_tok)_sysSpeakItem(it,my);});
       }).catch(function(){
         _gemFailUntil=Date.now()+120000; // Gemini nghẽn → dùng ổn định 1 giọng máy 2 phút, không lẫn lộn
+        var st=$('elsa-status');if(st&&CFG.apiKey)st.textContent='🔈 Giọng AI tạm hết lượt — đang dùng giọng máy';
         if(my===_tok)_sysSpeakItem(it,my);
       });
   } else _sysSpeakItem(it,my);
