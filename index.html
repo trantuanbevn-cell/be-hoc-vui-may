@@ -234,15 +234,22 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:10p
       <button class="snd" onclick="sayNow(homeGreeting())">🔊</button>
     </div>
   </div>
-  <div class="mbox">
-    <div class="mbox-t">🗓️ Nhiệm vụ hôm nay <span id="mis-count" style="margin-left:auto;font-size:13px;color:var(--gold2);"></span></div>
-    <div id="mis-list"></div>
-    <div id="mis-bonus" style="text-align:center;font-size:13px;font-weight:800;color:var(--gold2);font-family:var(--ffs);margin-top:6px;"></div>
-  </div>
+  <div class="mbox" id="quest-home" style="background:linear-gradient(150deg,#FFF3F8,#F0F9FF);"></div>
   <div class="mbox">
     <div class="mbox-t">🌟 Việc tốt hôm nay <span style="margin-left:auto;font-size:11px;color:#A08CA6;font-family:var(--ffs);">ba mẹ xác nhận</span></div>
     <div id="beh-list"></div>
   </div>
+</div>
+
+<!-- QUEST — lộ trình bài học 1 chạm -->
+<div id="s-quest" class="scr">
+  <div class="hd">
+    <button class="back-b" onclick="quitQuest()">← Nghỉ chút</button>
+    <h2 id="qs-title">🎯 Nhiệm vụ</h2>
+    <div class="chip" id="qs-prog" style="min-width:64px;justify-content:center;">1/15</div>
+  </div>
+  <div class="mis-prog" style="margin-bottom:12px;height:12px;"><div class="mis-fill" id="qs-bar" style="width:0%;"></div></div>
+  <div class="mbox" id="qs-body"></div>
 </div>
 
 <!-- SUBJECTS GRID -->
@@ -303,7 +310,7 @@ var $=function(id){return document.getElementById(id);};
 var ME_KEY='mayelsa_v3';
 function defState(){return{
   xu:0, streak:0, lastDay:'', totalRedeemed:0, history:[],
-  badges:[], mis:{day:'',prog:{},claimed:{},bonus:false},
+  badges:[], quest:null, sesCount:0,
   beh:{day:'',done:{}},
   cat:{level:1,exp:0,love:55,food:60,energy:70,happy:65,owned:[],equipped:[]},
   chuGrp:0, chuSes:1
@@ -779,73 +786,377 @@ function updateXuUI(){
 }
 
 /* ════════════════════════════════════════════════════════
-   NHIỆM VỤ HẰNG NGÀY — lộ trình học tự động theo thứ
+   NHIỆM VỤ HÔM NAY — lộ trình 1 chạm: bé bấm Nhận,
+   15 câu / 5 môn lần lượt hiện ra, xong môn này sang môn khác
 ════════════════════════════════════════════════════════ */
-var EXTRA_ROT=['kns','kh','gio','nhac'];
-function misDefToday(){
-  var d=new Date().getDay();
-  var main4=(d%2===0)?{id:'logic',sub:'logic',ic:'🧩',nm:'Tư duy logic',ds:'Làm đúng 4 câu đố tư duy',need:4,xu:8}
-                     :{id:'hinh',sub:'hinh',ic:'🔷',nm:'Hình học',ds:'Làm đúng 4 câu về hình',need:4,xu:8};
-  var exId=EXTRA_ROT[d%4];
-  var exMap={kns:{ic:'🌟',nm:'Kỹ năng sống',ds:'Làm đúng 4 câu bé ngoan'},kh:{ic:'🔬',nm:'Khám phá khoa học',ds:'Trả lời đúng 4 câu vì sao'},gio:{ic:'⏰',nm:'Giờ và lịch',ds:'Làm đúng 4 câu về thời gian'},nhac:{ic:'🎵',nm:'Âm nhạc',ds:'Chơi đúng 4 lần trò âm nhạc'}};
-  return [
-    {id:'toan',sub:'toan',ic:'🔢',nm:'Toán mỗi ngày',ds:'Làm đúng 5 câu toán',need:5,xu:8},
-    {id:'chu',sub:'chu',ic:'🔤',nm:'Chữ cái mỗi ngày',ds:'Làm đúng 5 câu chữ và vần',need:5,xu:8},
-    {id:'en',sub:'en',ic:'🇬🇧',nm:'English time',ds:'Làm đúng 5 câu tiếng Anh',need:5,xu:8},
-    main4,
-    {id:exId,sub:exId,ic:exMap[exId].ic,nm:exMap[exId].nm,ds:exMap[exId].ds,need:4,xu:8},
-    {id:'free',sub:'any',ic:'💪',nm:'Siêu sao chăm chỉ',ds:'Làm đúng thêm 6 câu bất kỳ',need:6,xu:10}
-  ];
+var SUB_META={toan:['🔢','Toán'],chu:['🔤','Chữ cái'],en:['🇬🇧','English'],logic:['🧩','Tư duy'],hinh:['🔷','Hình học'],kns:['🌟','Bé ngoan'],kh:['🔬','Khoa học'],gio:['⏰','Giờ & lịch']};
+/* ── Thời lượng tăng dần theo buổi: 1-10: ~15ph · 11-20: ~20ph · 21-30: ~25ph · 31+: ~30ph ── */
+var TIERS=[{mins:15,bonus:25},{mins:20,bonus:30},{mins:25,bonus:35},{mins:30,bonus:40}];
+var TIER_SIZES=[
+  {toan:5,chu:5,en:4,lh:4,extra:3,both:false},  /* 21 câu ≈ 15 phút */
+  {toan:6,chu:6,en:5,lh:4,extra:3,both:true},   /* 28 câu ≈ 20 phút */
+  {toan:8,chu:7,en:6,lh:5,extra:4,both:true},   /* 35 câu ≈ 25 phút */
+  {toan:9,chu:8,en:7,lh:6,extra:6,both:true}    /* 42 câu ≈ 30 phút */
+];
+function sesTier(){return Math.min(3,Math.floor((S.sesCount||0)/10));}
+function questPlan(){
+  var d0=new Date(),s=d0.getFullYear()*10000+(d0.getMonth()+1)*100+d0.getDate();
+  var lcg=function(){s=(s*1103515245+12345)%2147483648;return s/2147483648;};
+  function mix(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(lcg()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function types(pool,n){var a=mix(pool),o=[];for(var i=0;i<n;i++)o.push(a[i%a.length]);return o;}
+  var d=d0.getDay(),sz=TIER_SIZES[sesTier()],plan=[];
+  types(['dem','find','tinh','ss','lien'],sz.toan).forEach(function(t){plan.push({sub:'toan',t:t});});
+  types(['fc','hl','cd','tone'],sz.chu).forEach(function(t){plan.push({sub:'chu',t:t});});
+  types(['ea','el','num'],sz.en).forEach(function(t){plan.push({sub:'en',t:t});});
+  var lg=types(['seq','odd','size'],sz.lh),hi=types(['shape','real','spa'],sz.lh);
+  if(sz.both){
+    var pair=d%2===0?[['logic',lg],['hinh',hi]]:[['hinh',hi],['logic',lg]];
+    pair.forEach(function(p){p[1].forEach(function(t){plan.push({sub:p[0],t:t});});});
+  } else {
+    var one=d%2===0?['logic',lg]:['hinh',hi];
+    one[1].forEach(function(t){plan.push({sub:one[0],t:t});});
+  }
+  var pools={kns:['kns','emo'],kh:['kh'],gio:['clock','buoi']};
+  var order=['kns','kh','gio'],e1=order[d%3];
+  if(sz.extra<=4){
+    types(pools[e1],sz.extra).forEach(function(t){plan.push({sub:e1,t:t});});
+  } else {
+    var e2=order[(d+1)%3];
+    types(pools[e1],3).forEach(function(t){plan.push({sub:e1,t:t});});
+    types(pools[e2],sz.extra-3).forEach(function(t){plan.push({sub:e2,t:t});});
+  }
+  return plan;
 }
 function ensureDay(){
   var t=todayStr();
-  if(S.mis.day!==t){S.mis={day:t,prog:{},claimed:{},bonus:false};}
-  if(S.beh.day!==t){S.beh={day:t,done:{}};}
+  if(!S.quest||S.quest.day!==t)S.quest={day:t,plan:questPlan(),idx:0,done:false,rewardTaken:false};
+  if(!S.beh||S.beh.day!==t)S.beh={day:t,done:{}};
   saveS();
 }
-/* gọi mỗi khi bé trả lời ĐÚNG, sub = mã môn */
-function misProgress(sub){
+/* mỗi câu đúng ở chế độ tự luyện các môn: +1 xu */
+function misProgress(sub){addXu(1,'Trả lời đúng');}
+
+/* ── Thẻ nhiệm vụ trên trang chủ ── */
+function renderQuest(){
   ensureDay();
-  addXu(1,'Trả lời đúng');
-  var defs=misDefToday(),changed=false;
-  defs.forEach(function(m){
-    var match=(m.sub===sub)||(m.sub==='any');
-    if(!match||S.mis.claimed[m.id])return;
-    S.mis.prog[m.id]=(S.mis.prog[m.id]||0)+1;
-    if(S.mis.prog[m.id]>=m.need){
-      S.mis.claimed[m.id]=true;changed=true;
-      addXu(m.xu,'Xong nhiệm vụ: '+m.nm,true);
-      say('Hoan hô! Mây Elsa hoàn thành nhiệm vụ '+m.nm+'! Được thưởng '+m.xu+' xu!');floatXu(m.xu);
-    }
-  });
-  // thưởng hoàn thành cả ngày + streak
-  if(!S.mis.bonus&&defs.every(function(m){return S.mis.claimed[m.id];})){
-    S.mis.bonus=true;
-    var yst=new Date(Date.now()-86400000).toDateString();
-    S.streak=(S.lastDay===yst)?S.streak+1:1;
-    S.lastDay=todayStr();
-    addXu(20,'Hoàn thành cả ngày! 🏆',true);
-    say('Tuyệt vời ông mặt trời! Mây Elsa hoàn thành tất cả nhiệm vụ hôm nay! Thưởng 20 xu và một ngôi sao chăm chỉ!');floatXu(20);
+  var el=$('quest-home');if(!el)return;
+  var qp=S.quest,total=qp.plan.length,idx=Math.min(qp.idx,total);
+  var subs=[];qp.plan.forEach(function(p){if(subs.indexOf(p.sub)<0)subs.push(p.sub);});
+  var icons=subs.map(function(x){return SUB_META[x][0];}).join(' ');
+  var ti=TIERS[sesTier()];
+  var h='<div class="mbox-t" style="font-size:18px;">🎯 Nhiệm vụ hôm nay <span style="margin-left:auto;font-size:12px;color:var(--ic5);">Buổi thứ '+((S.sesCount||0)+1)+'</span></div>'
+    +'<div style="font-size:13px;color:var(--pk5);font-weight:700;font-family:var(--ffs);margin-bottom:10px;">'+icons+' · '+total+' câu · khoảng '+ti.mins+' phút · thưởng '+ti.bonus+' 🪙 + quà</div>'
+    +'<div class="mis-prog" style="height:14px;margin-bottom:12px;"><div class="mis-fill" style="width:'+(idx/total*100)+'%;"></div></div>';
+  if(qp.done){
+    h+='<div style="text-align:center;font-size:16px;font-weight:800;color:var(--ok);margin-bottom:10px;">🏆 Đã hoàn thành hôm nay! Mây siêu giỏi!</div>';
+    if(!qp.rewardTaken)h+='<div class="row-c"><button class="btn-p" style="font-size:17px;padding:14px 30px;" onclick="openQuestReward()">🎁 Chọn phần thưởng</button></div>';
+    else h+='<div class="row-c"><button class="btn-g" onclick="go(\'hoc\')">📚 Luyện thêm môn bé thích</button></div>';
+  } else if(idx>0){
+    h+='<div style="text-align:center;font-size:13px;font-weight:700;color:#A08CA6;font-family:var(--ffs);margin-bottom:10px;">Đã làm '+idx+'/'+total+' câu — cố lên nào!</div>'
+      +'<div class="row-c"><button class="btn-p" style="font-size:18px;padding:15px 34px;" onclick="startQuest()">▶️ Làm tiếp nhiệm vụ</button></div>';
+  } else {
+    h+='<div class="row-c"><button class="btn-p" style="font-size:19px;padding:16px 38px;animation:pulse 1.8s ease-in-out infinite;" onclick="startQuest()">🚀 Nhận nhiệm vụ</button></div>';
   }
-  saveS();
-  if(changed||true)renderMissions();
-}
-function renderMissions(){
-  ensureDay();
-  var defs=misDefToday(),el=$('mis-list');if(!el)return;
-  var doneCount=defs.filter(function(m){return S.mis.claimed[m.id];}).length;
-  $('mis-count').textContent=doneCount+'/'+defs.length+' xong';
-  el.innerHTML=defs.map(function(m){
-    var p=Math.min(S.mis.prog[m.id]||0,m.need),done=!!S.mis.claimed[m.id];
-    var sub=m.sub==='any'?'hoc':m.sub;
-    return '<div class="mis-card'+(done?' done':'')+'" onclick="'+(m.sub==='any'?"go('hoc')":"openMon('"+m.sub+"')")+'">'
-      +'<div class="mis-ic">'+(done?'✅':m.ic)+'</div>'
-      +'<div style="flex:1;"><div class="mis-nm">'+m.nm+'</div><div class="mis-ds">'+m.ds+'</div>'
-      +'<div class="mis-prog"><div class="mis-fill" style="width:'+(p/m.need*100)+'%;"></div></div></div>'
-      +'<div class="mis-xu">'+(done?'Đã nhận ✓':p+'/'+m.need+'<br>+'+m.xu+' 🪙')+'</div></div>';
-  }).join('');
-  $('mis-bonus').textContent=S.mis.bonus?'🏆 Đã nhận thưởng ngày hoàn hảo +20 xu!':'Hoàn thành hết 6 nhiệm vụ → thưởng thêm 20 xu 🏆';
+  el.innerHTML=h;
   renderBeh();
+}
+function startQuest(){
+  ensureDay();
+  document.querySelectorAll('.scr').forEach(function(x){x.classList.remove('on');});
+  $('s-quest').classList.add('on');
+  window.scrollTo(0,0);
+  if(S.quest.idx===0&&!S.quest.done)sayNow('Nhiệm vụ hôm nay bắt đầu! Mây Elsa cố lên nhé!');
+  renderQuestStep(S.quest.idx>0);
+}
+function quitQuest(){sayStop();go('home');}
+var _qWrong=0,_qRepeat=null;
+function renderQuestStep(skipTrans){
+  var qp=S.quest;
+  if(qp.idx>=qp.plan.length){finishQuest();return;}
+  var cur=qp.plan[qp.idx],prev=qp.idx>0?qp.plan[qp.idx-1]:null;
+  $('qs-prog').textContent=(qp.idx+1)+'/'+qp.plan.length;
+  $('qs-bar').style.width=(qp.idx/qp.plan.length*100)+'%';
+  $('qs-title').textContent=SUB_META[cur.sub][0]+' '+SUB_META[cur.sub][1];
+  if(!skipTrans&&qp.plan.length>=28&&qp.idx>0&&qp.idx%14===0){
+    $('qs-body').innerHTML='<div style="text-align:center;padding:20px 0;">'
+      +'<div style="font-size:60px;margin-bottom:8px;">🧃</div>'
+      +'<div style="font-size:19px;font-weight:800;color:var(--pk6);">Giải lao chút nào!</div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--ic5);margin:6px 0 16px;font-family:var(--ffs);">Bé uống ngụm nước, vươn vai, chớp chớp mắt nhé!</div>'
+      +'<button class="btn-p" style="font-size:17px;padding:14px 32px;" onclick="renderQuestStep(true)">Học tiếp nào ▶️</button></div>';
+    say('Giải lao chút nào! Bé uống ngụm nước, vươn vai rồi mình học tiếp nhé!');
+    return;
+  }
+  if(!skipTrans&&prev&&prev.sub!==cur.sub){
+    $('qs-body').innerHTML='<div style="text-align:center;padding:20px 0;">'
+      +'<div style="font-size:60px;margin-bottom:8px;">🎉</div>'
+      +'<div style="font-size:19px;font-weight:800;color:var(--pk6);">Xong phần '+SUB_META[prev.sub][1]+' rồi!</div>'
+      +'<div style="font-size:15px;font-weight:700;color:var(--ic5);margin:6px 0 16px;">Tiếp theo: '+SUB_META[cur.sub][0]+' '+SUB_META[cur.sub][1]+'</div>'
+      +'<button class="btn-p" style="font-size:17px;padding:14px 32px;" onclick="renderQuestStep(true)">Tiếp tục ▶️</button></div>';
+    say('Giỏi lắm! Xong phần '+SUB_META[prev.sub][1]+' rồi! Tiếp theo là '+SUB_META[cur.sub][1]+' nha!');
+    return;
+  }
+  _qWrong=0;
+  QGEN[cur.t]();
+}
+function qNext(){S.quest.idx++;saveS();renderQuestStep();}
+function qScaffold(inner){
+  $('qs-body').innerHTML=inner+'<div class="msg" id="qq-msg"></div>'
+    +'<div class="row-c"><button class="snd" onclick="if(_qRepeat)_qRepeat()">🔊 Nghe lại</button></div>';
+}
+function qSay(t){_qRepeat=function(){sayNow(t);};say(t);}
+function qSayEn(t){_qRepeat=function(){sayEnNow(t);};sayEn(t);}
+function qOpts(list,correct,fmt,explain,col,enPraise){
+  var el=$('qq-opts');_qWrong=0;
+  el.innerHTML=shuffle(list).map(function(o){
+    return '<button class="opt"'+(col?' style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"':'')+' data-v="'+esc(o)+'">'+(fmt?fmt(o):o)+'</button>';}).join('');
+  el.querySelectorAll('.opt').forEach(function(b){
+    b.onclick=function(){
+      var ok=String(b.getAttribute('data-v'))===String(correct);
+      if(ok){
+        el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;if(x!==b)x.classList.add('dim');});
+        b.classList.add('ok');$('qq-msg').textContent='🎉 Đúng rồi!';
+        addXu(1,'Trả lời đúng');
+        if(enPraise){sayEnNow(enPraise);}else{sayNow(praise()+(explain?' '+explain:''));}
+        setTimeout(qNext,1900);
+      } else {
+        b.classList.add('bad');b.onclick=null;setTimeout(function(){b.classList.add('dim');},350);
+        _qWrong++;
+        if(_qWrong>=3){
+          el.querySelectorAll('.opt').forEach(function(x){x.onclick=null;
+            if(String(x.getAttribute('data-v'))===String(correct))x.classList.add('ok');else x.classList.add('dim');});
+          $('qq-msg').textContent='💙 Đáp án đúng đây nè, không sao nhé!';
+          sayNow('Không sao đâu! Đáp án đúng là đây nè. '+(explain||'')+' Mình sang câu tiếp nhé!');
+          setTimeout(qNext,2800);
+        } else {$('qq-msg').textContent='💛 Thử lại nhé Mây!';sayNow(retry());}
+      }
+    };
+  });
+}
+/* ── Bộ sinh câu hỏi cho nhiệm vụ ── */
+var QGEN={
+dem:function(){
+  var ic=pick(DEM_ICONS),n=isMG()?(1+rnd(6)):(2+rnd(9));
+  qScaffold('<div style="text-align:center;font-size:44px;line-height:1.4;margin-bottom:8px;">'+Array(n).fill(ic[0]).join(' ')+'</div><div class="q-txt">Có bao nhiêu '+ic[1]+'?</div><div class="opts" id="qq-opts"></div>');
+  var o=[n];while(o.length<(isMG()?3:4)){var x=1+rnd(10);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,n,null,'Có '+TEN_SO[n]+' '+ic[1]+'.');
+  qSay('Bé đếm xem có bao nhiêu '+ic[1]+' nhé!');
+},
+find:function(){
+  var c=rnd(maxSo()+1);
+  qScaffold('<div class="q-txt">Bé hãy tìm số '+c+'</div><div class="opts" id="qq-opts"></div>');
+  var o=[c];while(o.length<6){var x=rnd(maxSo()+1);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,c,null,'Đây là số '+TEN_SO[c]+'.');
+  qSay('Mây ơi, tìm số '+TEN_SO[c]+' nhé!');
+},
+tinh:function(){
+  var a,b,kq;
+  if(isMG()){a=1+rnd(4);b=1+rnd(Math.max(1,5-a));kq=a+b;}
+  else{a=1+rnd(8);b=1+rnd(Math.min(9-a,5)+1);kq=a+b;}
+  qScaffold('<div class="q-big" style="display:flex;justify-content:center;gap:14px;"><span style="color:var(--pk4);">'+a+'</span><span style="color:var(--gold2);">+</span><span style="color:var(--ic4);">'+b+'</span><span style="color:#A08CA6;">= ?</span></div>'
+    +'<div class="dotwrap">'+dotHtml(a)+'<div style="width:14px;"></div>'+dotHtml(b,'b')+'</div><div class="opts" id="qq-opts"></div>');
+  var o=[kq];while(o.length<(isMG()?3:4)){var x=rnd(isMG()?8:11);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,kq,null,a+' cộng '+b+' bằng '+kq+'.');
+  qSay(a+' cộng '+b+' bằng mấy? Bé đếm chấm tròn nha!');
+},
+ss:function(){
+  var m=isMG()?6:10,a=1+rnd(m),b=1+rnd(m);
+  qScaffold('<div style="display:flex;justify-content:center;gap:26px;align-items:flex-start;margin-bottom:6px;">'
+    +'<div style="text-align:center;"><div class="q-big" style="margin:0;color:var(--pk4);">'+a+'</div><div class="dotwrap">'+dotHtml(Math.min(a,10))+'</div></div>'
+    +'<div style="text-align:center;"><div class="q-big" style="margin:0;color:var(--ic4);">'+b+'</div><div class="dotwrap">'+dotHtml(Math.min(b,10),'b')+'</div></div></div>'
+    +'<div class="q-txt">Bên nào nhiều hơn?</div><div class="opts" id="qq-opts"></div>');
+  var correct=a>b?'🌸 Bên hồng nhiều hơn':a<b?'🔵 Bên xanh nhiều hơn':'🤝 Bằng nhau';
+  qOpts(['🌸 Bên hồng nhiều hơn','🔵 Bên xanh nhiều hơn','🤝 Bằng nhau'],correct,function(o){return '<span style="font-size:15px;">'+o+'</span>';},
+    a===b?'Hai bên bằng nhau.':'Bên '+(a>b?'hồng có '+a:'xanh có '+b)+' chấm, nhiều hơn.');
+  qSay('Bé đếm chấm hai bên xem bên nào nhiều hơn nè?');
+},
+lien:function(){
+  var after=isMG()?true:Math.random()<0.5;
+  var n=isMG()?(1+rnd(8)):(after?1+rnd(18):2+rnd(18));
+  var ans=after?n+1:n-1;
+  qScaffold('<div class="q-txt">'+(after?'Đếm tiếp nào: sau số này là số mấy?':'Số liền trước của số này là số mấy?')+'</div><div class="q-big">'+n+'</div><div class="opts" id="qq-opts"></div>');
+  var o=[ans];while(o.length<(isMG()?3:4)){var x=rnd(maxSo()+1);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,ans,null,'Sau số '+n+' là số '+ans+'.');
+  qSay((after?'Đếm tiếp sau số ':'Số liền trước của số ')+n+' là số mấy nhỉ?');
+},
+fc:function(){
+  var nhom=chuNhom(),tg=CHU[Math.random()<0.85?pick(nhom):rnd(CHU.length)];
+  qScaffold('<div class="q-txt">Bé hãy tìm chữ "'+tg.ch+'"</div><div class="opts" id="qq-opts"></div>');
+  var o=[tg.ch];while(o.length<6){var x=CHU[rnd(CHU.length)].ch;if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,tg.ch,null,tg.doc);
+  qSay('Mây ơi, tìm chữ '+tg.ch+'. Như trong từ '+tg.tu[0].w+'.');
+},
+hl:function(){
+  var C=CHU[rnd(CHU.length)],toLower=Math.random()<0.5;
+  var correct=toLower?C.ch:C.ch.toUpperCase();
+  qScaffold('<div class="q-txt">'+(toLower?'Tìm chữ in thường của chữ này':'Tìm chữ IN HOA của chữ này')+'</div><div class="q-big" style="color:var(--pk4);">'+(toLower?C.ch.toUpperCase():C.ch)+'</div><div class="opts" id="qq-opts"></div>');
+  var o=[correct];while(o.length<4){var x=CHU[rnd(CHU.length)];var v=toLower?x.ch:x.ch.toUpperCase();if(o.indexOf(v)<0)o.push(v);}
+  qOpts(o,correct,null,C.ch.toUpperCase()+' và '+C.ch+' là cùng một chữ '+C.ch+'.');
+  qSay('Chữ '+C.ch+'. '+(toLower?'Tìm chữ in thường giống nó nhé!':'Tìm chữ in hoa giống nó nhé!'));
+},
+cd:function(){
+  var C=CHU[rnd(CHU.length)],t=pick(C.tu);
+  qScaffold('<div class="q-big">'+t.e+'</div><div class="q-txt">Từ "'+t.w+'" bắt đầu bằng chữ nào?</div><div class="opts" id="qq-opts"></div>');
+  var o=[C.ch];while(o.length<4){var x=CHU[rnd(CHU.length)].ch;if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,C.ch,null,'"'+t.w+'" bắt đầu bằng chữ '+C.ch+'.');
+  qSay(t.w+'! Từ '+t.w+' bắt đầu bằng chữ nào nhỉ?');
+},
+tone:function(){
+  var w=pick(TONE_WORDS);
+  qScaffold('<div style="display:flex;justify-content:center;gap:8px;align-items:center;margin-bottom:8px;">'
+    +w.base.split('').map(function(c){return '<div class="opt" style="min-width:60px;min-height:60px;pointer-events:none;">'+c+'</div>';}).join('')
+    +'<div class="opt" style="min-width:60px;min-height:60px;pointer-events:none;border-style:dashed;color:var(--gold2);">?</div>'
+    +'<div style="font-size:38px;margin-left:8px;">'+w.e+'</div></div>'
+    +'<div class="q-txt" style="font-size:15px;">Nghe cô đọc, chọn dấu để "'+w.base+'" thành từ đúng</div><div class="opts" id="qq-opts"></div>');
+  qOpts([0,1,2,3,4,5],w.dau,function(i){return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:24px;color:'+DAU_THANH[i].mau+';">'+DAU_THANH[i].sym+'</span><span style="font-size:10px;font-family:var(--ffs);">'+DAU_THANH[i].ten+'</span></span>';},
+    'Chữ '+w.base+' thêm '+DAU_THANH[w.dau].ten+' thành '+w.w+'. '+w.m+'.');
+  qSay('Nghe cô đọc nhé: '+w.w+'. '+w.m+'. Bé chọn dấu nào?');
+},
+ea:function(){
+  var a=EN_ALPHA[rnd(26)];
+  qScaffold('<div class="q-txt">Find the letter! Nghe rồi tìm chữ nhé</div><div class="opts" id="qq-opts"></div>');
+  var o=[a[0]];while(o.length<6){var x=EN_ALPHA[rnd(26)][0];if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,a[0],null,null,false,'Great job! '+a[0]+'! '+a[0]+' is for '+a[1]+'!');
+  qSayEn('Find the letter '+a[0]+'! '+a[0]+'!');
+},
+el:function(){
+  var topic=EN_TOPICS[pick(Object.keys(EN_TOPICS))],w=pick(topic);
+  qScaffold('<div class="q-txt">👂 Listen! Nghe rồi chọn hình đúng</div><div class="opts" id="qq-opts"></div>');
+  var o=[w];while(o.length<4){var x=pick(topic);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o.map(function(x){return x[0];}),w[0],null,null,false,'Yes! This is the '+w[1]+'! '+w[1]+' well done!');
+  qSayEn('Where is the '+w[1]+'? Find the '+w[1]+'!');
+},
+num:function(){
+  var n=1+rnd(isMG()?5:10),em=pick(['⭐','🍎','🎈','🌸','🐤']);
+  var words=EN_TOPICS['Numbers 🔢'];
+  qScaffold('<div style="text-align:center;font-size:44px;line-height:1.4;margin-bottom:8px;">'+Array(n).fill(em).join(' ')+'</div><div class="q-txt">How many? Có bao nhiêu?</div><div class="opts" id="qq-opts"></div>');
+  var o=[n];while(o.length<4){var x=1+rnd(10);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,n,function(x){return '<span style="display:flex;flex-direction:column;"><span>'+x+'</span><span style="font-size:12px;font-family:var(--ffs);">'+words[x-1][1]+'</span></span>';},null,false,'Yes! '+words[n-1][1]+'! Great counting!');
+  qSayEn('How many? Count and choose!');
+},
+seq:function(){
+  var q=pick(DAY_SEQ);
+  qScaffold('<div class="q-txt" style="font-size:14px;color:#A08CA6;">Gợi ý: '+q.hint+'</div>'
+    +'<div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;">'
+    +q.seq.map(function(x){return '<div class="opt" style="pointer-events:none;min-width:58px;min-height:58px;'+(x==='?'?'border-style:dashed;color:var(--gold2);':'')+'">'+x+'</div>';}).join('')+'</div>'
+    +'<div class="opts" id="qq-opts"></div>');
+  qOpts(q.opts.slice(),q.ans,null,q.hint+'.');
+  qSay(q.hint+'. Hình tiếp theo là gì nhỉ?');
+},
+odd:function(){
+  var q=pick(ODD_ONE);
+  qScaffold('<div class="q-txt">'+q.hint+'. Bạn nào khác nhóm?</div><div class="opts" id="qq-opts"></div>');
+  qOpts(q.items.slice(),q.ans,null,q.hint+'.');
+  qSay(q.hint+'. Bạn nào khác nhóm nhỉ?');
+},
+size:function(){
+  var q=pick(SIZE_Q);
+  qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
+  qOpts(q.opts.slice(),q.ans,null,null);
+  qSay(q.q);
+},
+shape:function(){
+  var sh=SHAPES[rnd(SHAPES.length)];
+  qScaffold('<div class="clockwrap"><svg width="104" height="104" viewBox="0 0 '+sh.w+' '+sh.h+'">'+sh.svg+'</svg></div><div class="q-txt">Đây là hình gì?</div><div class="opts" id="qq-opts"></div>');
+  var o=[sh.n];while(o.length<4){var x=SHAPES[rnd(SHAPES.length)].n;if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,sh.n,function(x){return '<span style="font-size:15px;">'+x+'</span>';},'Đây là '+sh.n+'.');
+  qSay('Đây là hình gì nhỉ?');
+},
+real:function(){
+  var r=pick(REAL_SHAPES);
+  qScaffold('<div class="q-big">'+r[0]+'</div><div class="q-txt">Đồ vật này có hình gì?</div><div class="opts" id="qq-opts"></div>');
+  var names=SHAPES.map(function(x){return x.n;});
+  var o=[r[1]];while(o.length<4){var x=pick(names);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,r[1],function(x){return '<span style="font-size:15px;">'+x+'</span>';},'Nó có dạng '+r[1]+'.');
+  qSay('Đồ vật này có hình gì nhỉ?');
+},
+spa:function(){
+  var q=pick(SPATIAL);
+  qScaffold('<div style="text-align:center;font-size:50px;line-height:1.35;margin-bottom:8px;">'+q.lay+'</div><div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
+  qOpts(q.opts.slice(),q.ans,function(x){return '<span style="font-size:16px;">'+x+'</span>';},null);
+  qSay(q.q);
+},
+kns:function(){
+  var q=pick(KNS_Q);
+  qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts" style="flex-direction:column;align-items:stretch;"></div>');
+  qOpts([0,1,2],q.ans,function(i){return '<span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true);
+  qSay(q.q);
+},
+emo:function(){
+  var q=pick(EMO_SIT);
+  qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
+  var o=[q.ans];while(o.length<4){var x=pick(EMOTIONS)[0];if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,q.ans,null,q.giai);
+  qSay(q.q);
+},
+kh:function(){
+  var q=pick(KH_Q);
+  qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts" style="flex-direction:column;align-items:stretch;"></div>');
+  qOpts([0,1,2],q.ans,function(i){return '<span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true);
+  qSay(q.q);
+},
+clock:function(){
+  var hh=1+rnd(12);
+  qScaffold('<div class="clockwrap">'+drawClock(hh)+'</div><div class="q-txt">Đồng hồ chỉ mấy giờ?</div><div class="opts" id="qq-opts"></div>');
+  var o=[hh];while(o.length<3){var x=1+rnd(12);if(o.indexOf(x)<0)o.push(x);}
+  qOpts(o,hh,function(x){return x+' giờ';},'Kim ngắn màu xanh chỉ số '+hh+', là '+hh+' giờ.');
+  qSay('Kim ngắn màu xanh chỉ số mấy? Đồng hồ chỉ mấy giờ?');
+},
+buoi:function(){
+  var q=pick(BUOI_Q);
+  qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
+  qOpts(q.opts.slice(),q.ans,function(x){return '<span style="font-size:15px;">'+x+'</span>';},null);
+  qSay(q.q);
+}
+};
+/* ── Hoàn thành + chọn thưởng ── */
+function finishQuest(){
+  var qp=S.quest;
+  $('qs-prog').textContent=qp.plan.length+'/'+qp.plan.length;
+  $('qs-bar').style.width='100%';
+  $('qs-title').textContent='🏆 Hoàn thành!';
+  if(!qp.done){
+    qp.done=true;
+    var bn=TIERS[sesTier()].bonus;
+    S.sesCount=(S.sesCount||0)+1;
+    var yst=new Date(Date.now()-86400000).toDateString();
+    S.streak=(S.lastDay===yst)?S.streak+1:1;S.lastDay=todayStr();
+    addXu(bn,'Hoàn thành buổi học thứ '+S.sesCount+' 🏆');
+    checkBadges();saveS();updateXuUI();
+    sayNow('Tuyệt vời ông mặt trời! Mây Elsa hoàn thành buổi học thứ '+S.sesCount+' rồi! Được thưởng '+bn+' xu! Bé chọn phần thưởng nhé!');
+  }
+  openQuestReward();
+}
+function openQuestReward(){
+  document.querySelectorAll('.scr').forEach(function(x){x.classList.remove('on');});
+  $('s-quest').classList.add('on');
+  var canYT=S.xu>=40,canKeo=S.xu>=60;
+  $('qs-title').textContent='🎁 Chọn thưởng';
+  $('qs-body').innerHTML='<div style="text-align:center;padding:6px 0 14px;">'
+    +'<div style="font-size:64px;">🏆</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--pk6);">Mây Elsa siêu giỏi!</div>'
+    +'<div style="font-size:14px;font-weight:700;color:var(--gold2);margin-top:4px;">Bé đang có '+S.xu+' 🪙 · 🔥 '+S.streak+' ngày liền</div></div>'
+    +'<div class="q-txt" style="font-size:16px;">Bé muốn làm gì với xu nè?</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:0 auto;">'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;" onclick="questTakeReward(\'save\')"><span style="font-size:30px;">🏦</span>Tích xu để dành — mua quà to hơn!</button>'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canYT?'':'opacity:.45;')+'" onclick="questTakeReward(\'yt\')"><span style="font-size:30px;">▶️</span>YouTube Kids 15 phút — 40 🪙'+(canYT?'':' (thiếu '+(40-S.xu)+' xu)')+'</button>'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canKeo?'':'opacity:.45;')+'" onclick="questTakeReward(\'keo\')"><span style="font-size:30px;">🍬</span>Đổi kẹo ngọt — 60 🪙'+(canKeo?'':' (thiếu '+(60-S.xu)+' xu)')+'</button>'
+    +'</div>'
+    +'<div class="row-c" style="margin-top:16px;"><button class="btn-g" onclick="go(\'home\')">🏠 Về trang chủ</button></div>';
+}
+function questTakeReward(kind){
+  if(kind==='save'){
+    S.quest.rewardTaken=true;saveS();
+    sayNow('Bé để dành được '+S.xu+' xu rồi! Tích nhiều xu đổi quà to nha!');
+    go('home');return;
+  }
+  var cost=kind==='yt'?40:60,name=kind==='yt'?'YouTube Kids 15 phút':'Đổi kẹo ngọt';
+  if(S.xu<cost){sayNow('Chưa đủ xu rồi! Còn thiếu '+(cost-S.xu)+' xu nữa. Bé tích thêm nhé!');return;}
+  askPin(function(){
+    spendXu(cost,(kind==='yt'?'▶️ ':'🍬 ')+name);
+    S.quest.rewardTaken=true;saveS();
+    sayNow('Hoan hô! Mây đổi '+name+' thành công! Còn lại '+S.xu+' xu.');
+    go('home');
+  });
 }
 /* Việc tốt — ba mẹ xác nhận bằng PIN */
 var BEH_LIST=[
@@ -877,9 +1188,9 @@ function behDone(id){
   renderBeh();
 }
 function homeGreeting(){
-  var h=new Date().getHours();
-  var buoi=h<11?'buổi sáng':h<14?'buổi trưa':h<18?'buổi chiều':'buổi tối';
-  return 'Chào '+buoi+' Mây Elsa yêu quý! Hôm nay là '+THU[new Date().getDay()]+'. Mình cùng làm nhiệm vụ để nhận xu nhé!';
+  var hh=new Date().getHours();
+  var buoi=hh<11?'buổi sáng':hh<14?'buổi trưa':hh<18?'buổi chiều':'buổi tối';
+  return 'Chào '+buoi+' Mây Elsa yêu quý! Hôm nay là '+THU[new Date().getDay()]+'. Bấm nhận nhiệm vụ để bắt đầu học nào!';
 }
 
 /* ════════════════════════════════════════════════════════
@@ -890,7 +1201,7 @@ var ALL_BADGES=[
 {id:'x50',ic:'💰',nm:'50 xu',ck:function(){return S.xu>=50;}},
 {id:'x200',ic:'👛',nm:'200 xu',ck:function(){return S.xu>=200;}},
 {id:'x500',ic:'💎',nm:'500 xu',ck:function(){return S.xu>=500;}},
-{id:'perfect',ic:'🏆',nm:'Ngày hoàn hảo',ck:function(){return S.mis.bonus;}},
+{id:'perfect',ic:'🏆',nm:'Ngày hoàn hảo',ck:function(){return !!(S.quest&&S.quest.done);}},
 {id:'st3',ic:'🔥',nm:'3 ngày liên tục',ck:function(){return S.streak>=3;}},
 {id:'st7',ic:'🚀',nm:'7 ngày liên tục',ck:function(){return S.streak>=7;}},
 {id:'st30',ic:'🌟',nm:'30 ngày liên tục',ck:function(){return S.streak>=30;}},
@@ -933,7 +1244,7 @@ function go(id){
   document.querySelectorAll('.ntab').forEach(function(t){t.classList.remove('on');});
   var sc=$('s-'+id);if(sc)sc.classList.add('on');
   var nt=$('nt-'+(id==='mon'?'hoc':id));if(nt)nt.classList.add('on');
-  if(id==='home')renderMissions();
+  if(id==='home')renderQuest();
   if(id==='hoc')renderSubjects();
   if(id==='elsa')initChat();
   window.scrollTo(0,0);
@@ -2024,13 +2335,14 @@ function openPanel(which){
 }
 function closePanel(){$('panel-overlay').style.display='none';}
 var SHOP_TIME=[
-{id:'yt15',ic:'▶️',nm:'YouTube 15 phút',ds:'Xem hôm nay',cost:40},
+{id:'yt15',ic:'▶️',nm:'YouTube Kids 15 phút',ds:'Xem hôm nay',cost:40},
 {id:'yt30',ic:'📺',nm:'YouTube 30 phút',ds:'Xem hôm nay',cost:70},
 {id:'tv30',ic:'🎬',nm:'Xem tivi 30 phút',ds:'Buổi tối',cost:60},
 {id:'ipad30',ic:'📱',nm:'Chơi iPad 30 phút',ds:'Cuối ngày',cost:80},
 {id:'game_we',ic:'🎮',nm:'Game cuối tuần 1 tiếng',ds:'Chỉ thứ 7 / chủ nhật',cost:150,weekEnd:true}
 ];
 var SHOP_TOYS=[
+{id:'keo',ic:'🍬',nm:'Kẹo ngọt',ds:'Một phần kẹo bé thích',cost:60},
 {id:'sticker',ic:'🌸',nm:'Tập sticker Elsa',ds:'Mây tự chọn',cost:120},
 {id:'icecream',ic:'🍦',nm:'Đi ăn kem',ds:'Cùng ba mẹ',cost:150},
 {id:'book',ic:'📚',nm:'Sách tranh mới',ds:'Mây tự chọn sách',cost:200},
@@ -2281,7 +2593,7 @@ function hideSplash(){
   var sp=$('splash');sp.classList.add('hide');
   setTimeout(function(){
     sp.remove();$('app').style.display='block';
-    renderMissions();
+    renderQuest();
     setTimeout(function(){say(homeGreeting());},500);
   },650);
 }
