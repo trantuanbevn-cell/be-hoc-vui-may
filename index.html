@@ -2699,7 +2699,14 @@ setInterval(function(){if(S.cat.food>5)S.cat.food-=1;if(S.cat.energy<95)S.cat.en
      Các máy nhập cùng địa chỉ + cùng MÃ GIA ĐÌNH → xu, học bạ, tiến độ tự chảy qua nhau
    - Thủ công: Sao chép mã dữ liệu → dán sang máy kia (không cần cài gì)
 ════════════════════════════════════════════════════════ */
-var _syncBusy=false;
+var _syncBusy=false,_syncPulled=false;
+/* Trọng lượng tiến độ: xu + buổi học + số câu đã làm — dùng để không cho máy TRỐNG đè máy CÓ dữ liệu */
+function stateW(s){
+  if(!s)return 0;
+  var t=0;
+  if(s.skill&&s.skill.s)Object.keys(s.skill.s).forEach(function(k){t+=s.skill.s[k].n||0;});
+  return (s.xu||0)+(s.sesCount||0)*50+t+(s.totalRedeemed||0)*10+(s.streak||0);
+}
 function syncIsSupa(){return /supabase\.(co|com)/.test(CFG.syncUrl||'');}
 function syncOn(){
   if(!CFG.syncUrl||!CFG.syncCode||!navigator.onLine)return false;
@@ -2732,18 +2739,23 @@ function syncPull(manual){
     ?fetch(_supaBase()+'?code=eq.'+encodeURIComponent(CFG.syncCode)+'&select=sv,data',{headers:_supaHead()}).then(function(r){return r.json();}).then(function(a){return (a&&a[0])||null;})
     :fetch(syncRef()).then(function(r){return r.json();});
   req.then(function(j){
-    if(j&&j.data&&(j.sv||0)>(S._sv||0)){
+    _syncPulled=true;
+    var rw=j&&j.data?stateW(j.data):0, lw=stateW(S);
+    var newer=j&&j.data&&(j.sv||0)>(S._sv||0);
+    if(j&&j.data&&rw>0&&(newer||lw===0)){
       S=Object.assign(defState(),j.data);
       saveS(true);updateXuUI();
       if($('s-home').classList.contains('on'))renderQuest();
-      _syncStatus('📥 Đã nhận dữ liệu mới hơn từ thiết bị khác');
+      _syncStatus('📥 Đã nhận dữ liệu từ thiết bị khác');
       if(manual)sayNow('Đã tải dữ liệu của Mây về máy này rồi nhé!');
-    } else if(manual)_syncStatus(j&&j.data?'✅ Máy này đang có dữ liệu mới nhất':'ℹ️ Trên mây chưa có dữ liệu — bấm Đẩy lên ngay từ máy cũ');
-  },function(){_syncStatus('⚠️ Không kết nối được máy chủ đồng bộ');});
+    } else if(lw>0&&(!j||!j.data||rw===0)){
+      _syncDirty=true;syncPush(); // trên mây trống hoặc chỉ có bản rỗng → đẩy bản thật của máy này lên
+    } else if(manual)_syncStatus(j&&j.data?'✅ Máy này đang có dữ liệu mới nhất':'ℹ️ Trên mây chưa có dữ liệu — mở app ở máy của bé trước nhé');
+  },function(){_syncPulled=true;_syncStatus('⚠️ Không kết nối được máy chủ đồng bộ');});
 }
-setInterval(function(){if(_syncDirty)syncPush();},20000);
+setInterval(function(){if(_syncDirty&&_syncPulled&&stateW(S)>0)syncPush();},20000);
 window.addEventListener('pagehide',function(){
-  if(!_syncDirty||!syncOn())return;
+  if(!_syncDirty||!syncOn()||!_syncPulled||stateW(S)===0)return;
   try{
     if(syncIsSupa())fetch(_supaBase(),{method:'POST',keepalive:true,headers:_supaHead({Prefer:'resolution=merge-duplicates'}),body:JSON.stringify([{code:CFG.syncCode,sv:S._sv||0,data:S}])});
     else fetch(syncRef(),{method:'PUT',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({sv:S._sv||0,data:S})});
