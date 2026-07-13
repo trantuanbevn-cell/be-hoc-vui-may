@@ -986,15 +986,51 @@ function renderQuestStep(skipTrans){
   QGEN[cur.t]();
 }
 function qNext(){S.quest.idx++;saveS();renderQuestStep();}
+var _qCorrect=null,_qMicAlt=null;
 function qScaffold(inner){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   $('qs-body').innerHTML=inner+'<div class="msg" id="qq-msg"></div>'
-    +'<div class="row-c"><button class="snd" onclick="if(_qRepeat)_qRepeat()">🔊 Nghe lại</button></div>';
+    +'<div class="row-c"><button class="snd" onclick="if(_qRepeat)_qRepeat()">🔊 Nghe lại</button>'
+    +(SR?'<button class="mic-b" id="qq-mic" onclick="qMic()" title="Bé nói đáp án">🎤</button>':'')
+    +'</div>';
+  _qCorrect=null;_qMicAlt=null;
+}
+function _norm(s){return String(s).toLowerCase().replace(/[.,!?…:;]/g,' ').replace(/\s+/g,' ').trim();}
+function _micMatch(said){
+  said=_norm(said);if(!said)return false;
+  var toks=said.split(' ');
+  return (_qMicAlt||[]).some(function(a){
+    a=_norm(a);if(!a)return false;
+    if(/^\d+$/.test(a))return toks.indexOf(a)>=0;          // số: khớp đúng từng từ
+    return said===a||said.indexOf(a)>=0||(a.indexOf(said)>=0&&said.length>=3);
+  });
+}
+function qMic(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR||!_qMicAlt)return;
+  sayStop();
+  var mb=$('qq-mic');if(mb)mb.classList.add('rec');
+  var r=new SR();r.lang='vi-VN';r.interimResults=false;r.maxAlternatives=3;
+  r.onend=r.onerror=function(){if(mb)mb.classList.remove('rec');};
+  r.onresult=function(e){
+    if(mb)mb.classList.remove('rec');
+    var hit=false;
+    for(var i=0;i<e.results[0].length&&!hit;i++)hit=_micMatch(e.results[0][i].transcript);
+    if(hit&&_qCorrect!==null){
+      var btns=document.querySelectorAll('#qq-opts .opt');
+      for(var j=0;j<btns.length;j++){
+        if(btns[j].getAttribute('data-v')===String(_qCorrect)&&btns[j].onclick){btns[j].click();return;}
+      }
+    } else sayNow('Chưa nghe rõ hoặc chưa đúng rồi. Bé nói lại hoặc bấm chọn nhé!');
+  };
+  try{beep(880,0.15);r.start();}catch(e){if(mb)mb.classList.remove('rec');}
 }
 function qSay(t){_qRepeat=function(){sayNow(t);};say(t);}
 function qSayEn(t){_qRepeat=function(){sayEnNow(t);};sayEn(t);}
-function qOpts(list,correct,fmt,explain,col,enPraise){
+function qOpts(list,correct,fmt,explain,col,enPraise,noShuffle){
   var el=$('qq-opts');_qWrong=0;
-  el.innerHTML=shuffle(list).map(function(o){
+  _qCorrect=String(correct);
+  var mb=$('qq-mic');if(mb)mb.style.display=_qMicAlt?'':'none';
+  el.innerHTML=(noShuffle?list.slice():shuffle(list)).map(function(o){
     return '<button class="opt"'+(col?' style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"':'')+' data-v="'+esc(o)+'">'+(fmt?fmt(o):o)+'</button>';}).join('');
   el.querySelectorAll('.opt').forEach(function(b){
     b.onclick=function(){
@@ -1027,6 +1063,7 @@ dem:function(){
   var ic=pick(DEM_ICONS),n=isMG()?(1+rnd(6)):(2+rnd(9));
   qScaffold('<div style="text-align:center;font-size:44px;line-height:1.4;margin-bottom:8px;">'+Array(n).fill(ic[0]).join(' ')+'</div><div class="q-txt">Có bao nhiêu '+ic[1]+'?</div><div class="opts" id="qq-opts"></div>');
   var o=[n];while(o.length<(isMG()?3:4)){var x=1+rnd(10);if(o.indexOf(x)<0)o.push(x);}
+  _qMicAlt=[String(n),TEN_SO[n]];
   qOpts(o,n,null,'Có '+TEN_SO[n]+' '+ic[1]+'.');
   qSay('Bé đếm xem có bao nhiêu '+ic[1]+' nhé!');
 },
@@ -1034,6 +1071,7 @@ find:function(){
   var c=rnd(maxSo()+1);
   qScaffold('<div class="q-txt">Bé hãy tìm số '+c+'</div><div class="opts" id="qq-opts"></div>');
   var o=[c];while(o.length<6){var x=rnd(maxSo()+1);if(o.indexOf(x)<0)o.push(x);}
+  _qMicAlt=[String(c),TEN_SO[c]];
   qOpts(o,c,null,'Đây là số '+TEN_SO[c]+'.');
   qSay('Mây ơi, tìm số '+TEN_SO[c]+' nhé!');
 },
@@ -1044,6 +1082,7 @@ tinh:function(){
   qScaffold('<div class="q-big" style="display:flex;justify-content:center;gap:14px;"><span style="color:var(--pk4);">'+a+'</span><span style="color:var(--gold2);">+</span><span style="color:var(--ic4);">'+b+'</span><span style="color:#A08CA6;">= ?</span></div>'
     +'<div class="dotwrap">'+dotHtml(a)+'<div style="width:14px;"></div>'+dotHtml(b,'b')+'</div><div class="opts" id="qq-opts"></div>');
   var o=[kq];while(o.length<(isMG()?3:4)){var x=rnd(isMG()?8:11);if(o.indexOf(x)<0)o.push(x);}
+  _qMicAlt=[String(kq),TEN_SO[kq]];
   qOpts(o,kq,null,a+' cộng '+b+' bằng '+kq+'.');
   qSay(a+' cộng '+b+' bằng mấy? Bé đếm chấm tròn nha!');
 },
@@ -1054,7 +1093,8 @@ ss:function(){
     +'<div style="text-align:center;"><div class="q-big" style="margin:0;color:var(--ic4);">'+b+'</div><div class="dotwrap">'+dotHtml(Math.min(b,10),'b')+'</div></div></div>'
     +'<div class="q-txt">Bên nào nhiều hơn?</div><div class="opts" id="qq-opts"></div>');
   var correct=a>b?'🌸 Bên hồng nhiều hơn':a<b?'🔵 Bên xanh nhiều hơn':'🤝 Bằng nhau';
-  qOpts(['🌸 Bên hồng nhiều hơn','🔵 Bên xanh nhiều hơn','🤝 Bằng nhau'],correct,function(o){return '<span style="font-size:15px;">'+o+'</span>';},
+  _qMicAlt=a>b?['bên hồng','hồng']:a<b?['bên xanh','xanh']:['bằng nhau','bằng'];
+  qOpts(['🌸 Bên hồng nhiều hơn','🔵 Bên xanh nhiều hơn','🤝 Bằng nhau'],correct,function(o){return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:34px;">'+o.split(' ')[0]+'</span><span style="font-size:11px;font-family:var(--ffs);">'+o.split(' ').slice(1).join(' ')+'</span></span>';},
     a===b?'Hai bên bằng nhau.':'Bên '+(a>b?'hồng có '+a:'xanh có '+b)+' chấm, nhiều hơn.');
   qSay('Bé đếm chấm hai bên xem bên nào nhiều hơn nè?');
 },
@@ -1064,6 +1104,7 @@ lien:function(){
   var ans=after?n+1:n-1;
   qScaffold('<div class="q-txt">'+(after?'Đếm tiếp nào: sau số này là số mấy?':'Số liền trước của số này là số mấy?')+'</div><div class="q-big">'+n+'</div><div class="opts" id="qq-opts"></div>');
   var o=[ans];while(o.length<(isMG()?3:4)){var x=rnd(maxSo()+1);if(o.indexOf(x)<0)o.push(x);}
+  _qMicAlt=[String(ans),TEN_SO[ans]];
   qOpts(o,ans,null,'Sau số '+n+' là số '+ans+'.');
   qSay((after?'Đếm tiếp sau số ':'Số liền trước của số ')+n+' là số mấy nhỉ?');
 },
@@ -1145,30 +1186,34 @@ size:function(){
 },
 shape:function(){
   var sh=SHAPES[rnd(SHAPES.length)];
-  qScaffold('<div class="clockwrap"><svg width="104" height="104" viewBox="0 0 '+sh.w+' '+sh.h+'">'+sh.svg+'</svg></div><div class="q-txt">Đây là hình gì?</div><div class="opts" id="qq-opts"></div>');
+  qScaffold('<div class="q-txt">👂 Bé nghe rồi chọn đúng hình nhé!</div><div class="opts" id="qq-opts"></div>');
   var o=[sh.n];while(o.length<4){var x=SHAPES[rnd(SHAPES.length)].n;if(o.indexOf(x)<0)o.push(x);}
-  qOpts(o,sh.n,function(x){return '<span style="font-size:15px;">'+x+'</span>';},'Đây là '+sh.n+'.');
-  qSay('Đây là hình gì nhỉ?');
+  _qMicAlt=[sh.n,sh.n.replace(/^Hình /,''),sh.n.replace(/^Ngôi |^Trái /,'')];
+  qOpts(o,sh.n,function(nm){var s=SHAPES.find(function(x){return x.n===nm;});return '<svg width="66" height="66" viewBox="0 0 '+s.w+' '+s.h+'">'+s.svg+'</svg>';},'Đây là '+sh.n+'.');
+  qSay('Mây ơi, tìm '+sh.n+' nhé!');
 },
 real:function(){
   var r=pick(REAL_SHAPES);
-  qScaffold('<div class="q-big">'+r[0]+'</div><div class="q-txt">Đồ vật này có hình gì?</div><div class="opts" id="qq-opts"></div>');
+  qScaffold('<div class="q-big">'+r[0]+'</div><div class="q-txt">Đồ vật này giống hình nào bên dưới?</div><div class="opts" id="qq-opts"></div>');
   var names=SHAPES.map(function(x){return x.n;});
   var o=[r[1]];while(o.length<4){var x=pick(names);if(o.indexOf(x)<0)o.push(x);}
-  qOpts(o,r[1],function(x){return '<span style="font-size:15px;">'+x+'</span>';},'Nó có dạng '+r[1]+'.');
-  qSay('Đồ vật này có hình gì nhỉ?');
+  _qMicAlt=[r[1],r[1].replace(/^Hình /,'')];
+  qOpts(o,r[1],function(nm){var s=SHAPES.find(function(x){return x.n===nm;});return '<svg width="60" height="60" viewBox="0 0 '+s.w+' '+s.h+'">'+s.svg+'</svg>';},'Nó có dạng '+r[1]+'.');
+  qSay('Đồ vật này giống hình nào nhỉ? Bé so hình dáng rồi chọn nha!');
 },
 spa:function(){
   var q=pick(SPATIAL);
   qScaffold('<div style="text-align:center;font-size:50px;line-height:1.35;margin-bottom:8px;">'+q.lay+'</div><div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
-  qOpts(q.opts.slice(),q.ans,function(x){return '<span style="font-size:16px;">'+x+'</span>';},null);
+  _qMicAlt=(function(){var t=q.ans.replace(/[⬆️⬇️👈👉]/g,'').trim().toLowerCase();return [t,t.split(' ').pop()];})();
+  qOpts(q.opts.slice(),q.ans,function(x){var em=x.split(' ').pop();var tx=x.replace(em,'').trim();return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:38px;">'+em+'</span><span style="font-size:11px;font-family:var(--ffs);">'+tx+'</span></span>';},null);
   qSay(q.q);
 },
 kns:function(){
   var q=pick(KNS_Q);
   qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts" style="flex-direction:column;align-items:stretch;"></div>');
-  qOpts([0,1,2],q.ans,function(i){return '<span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true);
-  qSay(q.q);
+  var order=shuffle([0,1,2]),SO_DOC=['một','hai','ba'];
+  qOpts(order,q.ans,function(i){var pos=order.indexOf(i);return '<span style="font-size:20px;font-weight:800;color:var(--pk4);margin-right:8px;">'+(pos+1)+'</span><span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true,null,true);
+  qSay(q.q+' '+order.map(function(i,pos){return 'Lựa chọn '+SO_DOC[pos]+': '+q.opts[i][1]+'.';}).join(' ')+' Bé chọn số mấy nào?');
 },
 emo:function(){
   var q=pick(EMO_SIT);
@@ -1180,20 +1225,23 @@ emo:function(){
 kh:function(){
   var q=pick(KH_Q);
   qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts" style="flex-direction:column;align-items:stretch;"></div>');
-  qOpts([0,1,2],q.ans,function(i){return '<span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true);
-  qSay(q.q);
+  var order=shuffle([0,1,2]),SO_DOC=['một','hai','ba'];
+  qOpts(order,q.ans,function(i){var pos=order.indexOf(i);return '<span style="font-size:20px;font-weight:800;color:var(--pk4);margin-right:8px;">'+(pos+1)+'</span><span style="font-size:26px;margin-right:6px;">'+q.opts[i][0]+'</span>'+q.opts[i][1];},q.giai,true,null,true);
+  qSay(q.q+' '+order.map(function(i,pos){return 'Lựa chọn '+SO_DOC[pos]+': '+q.opts[i][1]+'.';}).join(' ')+' Bé chọn số mấy nào?');
 },
 clock:function(){
   var hh=1+rnd(12);
   qScaffold('<div class="clockwrap">'+drawClock(hh)+'</div><div class="q-txt">Đồng hồ chỉ mấy giờ?</div><div class="opts" id="qq-opts"></div>');
   var o=[hh];while(o.length<3){var x=1+rnd(12);if(o.indexOf(x)<0)o.push(x);}
-  qOpts(o,hh,function(x){return x+' giờ';},'Kim ngắn màu xanh chỉ số '+hh+', là '+hh+' giờ.');
+  _qMicAlt=[String(hh),TEN_SO[hh]+' giờ',TEN_SO[hh]];
+  qOpts(o,hh,function(x){return '<span style="display:flex;flex-direction:column;align-items:center;"><span>'+x+'</span><span style="font-size:11px;font-family:var(--ffs);">giờ</span></span>';},'Kim ngắn màu xanh chỉ số '+hh+', là '+hh+' giờ.');
   qSay('Kim ngắn màu xanh chỉ số mấy? Đồng hồ chỉ mấy giờ?');
 },
 buoi:function(){
   var q=pick(BUOI_Q);
   qScaffold('<div class="q-txt">'+q.q+'</div><div class="opts" id="qq-opts"></div>');
-  qOpts(q.opts.slice(),q.ans,function(x){return '<span style="font-size:15px;">'+x+'</span>';},null);
+  _qMicAlt=(function(){var t=q.ans.replace(/^[^ ]+ /,'').toLowerCase();return [t,t.replace('buổi ','')];})();
+  qOpts(q.opts.slice(),q.ans,function(x){var em=x.split(' ')[0];var tx=x.split(' ').slice(1).join(' ');return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:36px;">'+em+'</span><span style="font-size:11px;font-family:var(--ffs);">'+tx+'</span></span>';},null);
   qSay(q.q);
 }
 };
@@ -2029,24 +2077,26 @@ function(body){
 }];
 function newShapeQ(){
   var s=SHAPES[rnd(SHAPES.length)];
-  $('hq-svg').innerHTML='<svg width="110" height="110" viewBox="0 0 '+s.w+' '+s.h+'">'+s.svg+'</svg>';
+  $('hq-svg').innerHTML='<div style="font-size:15px;font-weight:800;color:var(--pk6);">👂 Nghe rồi chọn đúng hình nhé!</div>';
   $('hq-msg').textContent='';
   var opts=[s.n];while(opts.length<4){var x=SHAPES[rnd(SHAPES.length)].n;if(opts.indexOf(x)<0)opts.push(x);}
   mkOpts('hq-opts',opts,s.n,function(ok){
     if(ok){$('hq-msg').textContent='🎉 Đúng! Đây là '+s.n+'!';onOk('hinh');setTimeout(newShapeQ,1700);}
-    else{$('hq-msg').textContent='💛 Đây là '+s.n+' đó, thử lại!';sayNow('Đây là '+s.n+' nè! Bé bấm '+s.n+' nha!');}
-  },function(o){return '<span style="font-size:16px;">'+o+'</span>';});
-  say('Đây là hình gì nhỉ?');
+    else{$('hq-msg').textContent='💛 Nghe lại rồi tìm '+s.n+' nhé!';sayNow('Chưa phải rồi! Tìm '+s.n+' nha!');}
+  },function(nm){var x=SHAPES.find(function(z){return z.n===nm;});return '<svg width="62" height="62" viewBox="0 0 '+x.w+' '+x.h+'">'+x.svg+'</svg>';});
+  say('Mây ơi, tìm '+s.n+' nhé!');
 }
 function newSolidQ(){
   var pairs=[['⚽','Khối cầu','Quả bóng'],['🍊','Khối cầu','Quả cam'],['🎲','Khối lập phương','Viên xúc xắc'],['🎁','Khối lập phương','Hộp quà vuông'],['🥫','Khối trụ','Lon sữa'],['🕯️','Khối trụ','Cây nến'],['🍦','Khối nón','Cây kem ốc quế'],['🎉','Khối nón','Nón sinh nhật']];
   var p=pick(pairs);
-  $('sq-e').textContent=p[0];$('sq-q').textContent=p[2]+' giống hình khối nào?';$('sq-msg').textContent='';
-  mkOpts('sq-opts',SOLIDS.map(function(s){return s.n;}),p[1],function(ok){
-    if(ok){$('sq-msg').textContent='🎉 Đúng! '+p[2]+' là '+p[1]+'!';onOk('hinh');setTimeout(newSolidQ,1800);}
-    else{$('sq-msg').textContent='💛 Thử lại nhé!';sayNow(retry());}
-  },function(o){return '<span style="font-size:15px;">'+o+'</span>';});
-  say(p[2]+' giống hình khối nào nhỉ?');
+  $('sq-e').textContent='';$('sq-q').textContent='👂 Nghe rồi chọn đồ vật đúng nhé!';$('sq-msg').textContent='';
+  var opts=[p],used=[p[1]];
+  while(opts.length<4){var x=pick(pairs);if(used.indexOf(x[1])<0){opts.push(x);used.push(x[1]);}}
+  mkOpts('sq-opts',opts.map(function(x){return x[0];}),p[0],function(ok){
+    if(ok){$('sq-msg').textContent='🎉 Đúng! '+p[2]+' là '+p[1]+'!';onOk('hinh',p[2]+' có dạng '+p[1]+'.');setTimeout(newSolidQ,1800);}
+    else{$('sq-msg').textContent='💛 Nghe lại rồi chọn nhé!';sayNow(retry());}
+  });
+  say('Bé tìm đồ vật có dạng '+p[1]+' nhé! Giống như '+SOLIDS.find(function(s){return s.n===p[1];}).vd+' đó!');
 }
 function newRealShape(){
   var r=pick(REAL_SHAPES);
@@ -2056,7 +2106,7 @@ function newRealShape(){
   mkOpts('rs-opts',opts,r[1],function(ok){
     if(ok){$('rs-msg').textContent='🎉 Đúng! Nó có dạng '+r[1]+'!';onOk('hinh');setTimeout(newRealShape,1700);}
     else{$('rs-msg').textContent='💛 Nhìn viền đồ vật thử xem!';sayNow(retry()+' Nhìn hình dáng bên ngoài của nó nha!');}
-  },function(o){return '<span style="font-size:15px;">'+o+'</span>';});
+  },function(nm){var x=SHAPES.find(function(z){return z.n===nm;});return '<svg width="58" height="58" viewBox="0 0 '+x.w+' '+x.h+'">'+x.svg+'</svg>';});
   say('Đồ vật này có hình gì nhỉ?');
 }
 function newSpatial(){
@@ -2065,7 +2115,7 @@ function newSpatial(){
   mkOpts('sp-opts',q.opts,q.ans,function(ok){
     if(ok){$('sp-msg').textContent='🎉 Đúng rồi!';onOk('hinh');setTimeout(newSpatial,1600);}
     else{$('sp-msg').textContent='💛 Nhìn kỹ vị trí nhé!';sayNow(retry());}
-  },function(o){return '<span style="font-size:16px;">'+o+'</span>';});
+  },function(x){var em=x.split(' ').pop();var tx=x.replace(em,'').trim();return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:38px;">'+em+'</span><span style="font-size:11px;font-family:var(--ffs);">'+tx+'</span></span>';});
   say(q.q);
 }
 /* ══════════ KỸ NĂNG SỐNG + CẢM XÚC ══════════ */
@@ -2086,8 +2136,9 @@ function newKNS(){
   $('kn-q').textContent=q.q;$('kn-msg').textContent='';
   var el=$('kn-opts');
   var order=shuffle(q.opts.map(function(o,i){return i;}));
-  el.innerHTML=order.map(function(i){
-    return '<button class="opt" data-i="'+i+'" style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"><span style="font-size:28px;">'+q.opts[i][0]+'</span>'+q.opts[i][1]+'</button>';}).join('');
+  var SO_DOC=['một','hai','ba'];
+  el.innerHTML=order.map(function(i,pos){
+    return '<button class="opt" data-i="'+i+'" style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"><span style="font-size:20px;font-weight:800;color:var(--pk4);">'+(pos+1)+'</span><span style="font-size:28px;">'+q.opts[i][0]+'</span>'+q.opts[i][1]+'</button>';}).join('');
   el.querySelectorAll('.opt').forEach(function(b){
     b.onclick=function(){
       if(+b.dataset.i===q.ans){
@@ -2097,7 +2148,7 @@ function newKNS(){
       } else {b.classList.add('bad');b.onclick=null;setTimeout(function(){b.classList.add('dim');},350);$('kn-msg').textContent='💛 Chưa đúng, bé nghĩ lại nhé!';sayNow(retry());}
     };
   });
-  say(q.q);
+  say(q.q+' '+order.map(function(i,pos){return 'Lựa chọn '+SO_DOC[pos]+': '+q.opts[i][1]+'.';}).join(' ')+' Bé chọn số mấy?');
 }
 function newEmo(){
   var q=pick(EMO_SIT);
@@ -2121,8 +2172,9 @@ function newKH(){
   $('kh-q').textContent=q.q;$('kh-msg').textContent='';
   var el=$('kh-opts');
   var order=shuffle(q.opts.map(function(o,i){return i;}));
-  el.innerHTML=order.map(function(i){
-    return '<button class="opt" data-i="'+i+'" style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"><span style="font-size:28px;">'+q.opts[i][0]+'</span>'+q.opts[i][1]+'</button>';}).join('');
+  var SO_DOC=['một','hai','ba'];
+  el.innerHTML=order.map(function(i,pos){
+    return '<button class="opt" data-i="'+i+'" style="font-size:16px;justify-content:flex-start;gap:12px;padding:14px 18px;"><span style="font-size:20px;font-weight:800;color:var(--pk4);">'+(pos+1)+'</span><span style="font-size:28px;">'+q.opts[i][0]+'</span>'+q.opts[i][1]+'</button>';}).join('');
   el.querySelectorAll('.opt').forEach(function(b){
     b.onclick=function(){
       if(+b.dataset.i===q.ans){
@@ -2132,7 +2184,7 @@ function newKH(){
       } else {b.classList.add('bad');b.onclick=null;setTimeout(function(){b.classList.add('dim');},350);$('kh-msg').textContent='💛 Chưa đúng, thử lại nhé!';sayNow(retry());}
     };
   });
-  say(q.q);
+  say(q.q+' '+order.map(function(i,pos){return 'Lựa chọn '+SO_DOC[pos]+': '+q.opts[i][1]+'.';}).join(' ')+' Bé chọn số mấy?');
 }
 
 /* ══════════ GIỜ & LỊCH ══════════ */
@@ -2193,7 +2245,7 @@ function newThu(){
   mkOpts('th-opts',opts,ans,function(ok){
     if(ok){$('th-msg').textContent='🎉 Đúng! Là '+ans+'!';onOk('gio');setTimeout(newThu,1800);}
     else{$('th-msg').textContent='💛 Đọc thứ tự các thứ trong tuần nhé!';sayNow(retry()+' Chủ nhật, thứ hai, thứ ba, thứ tư, thứ năm, thứ sáu, thứ bảy!');}
-  },function(o){return '<span style="font-size:15px;">'+o+'</span>';});
+  },function(o){var i=THU.indexOf(o);var big=i===0?'☀️':String(i+1);return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:30px;font-weight:800;">'+big+'</span><span style="font-size:10.5px;font-family:var(--ffs);">'+o+'</span></span>';});
   say(q);
 }
 function newBuoi(){
@@ -2202,7 +2254,7 @@ function newBuoi(){
   mkOpts('bu-opts',q.opts,q.ans,function(ok){
     if(ok){$('bu-msg').textContent='🎉 Đúng rồi!';onOk('gio');setTimeout(newBuoi,1700);}
     else{$('bu-msg').textContent='💛 Bé nghĩ lại xem!';sayNow(retry());}
-  },function(o){return '<span style="font-size:15px;">'+o+'</span>';});
+  },function(x){var em=x.split(' ')[0];var tx=x.split(' ').slice(1).join(' ');return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:36px;">'+em+'</span><span style="font-size:11px;font-family:var(--ffs);">'+tx+'</span></span>';});
   say(q.q);
 }
 
