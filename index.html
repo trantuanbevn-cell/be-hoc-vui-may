@@ -317,7 +317,11 @@ function defState(){return{
   chuGrp:0, chuSes:1
 };}
 var S=(function(){try{var s=JSON.parse(localStorage.getItem(ME_KEY));if(s&&typeof s.xu==='number')return Object.assign(defState(),s);}catch(e){}return defState();})();
-function saveS(){try{localStorage.setItem(ME_KEY,JSON.stringify(S));}catch(e){}}
+var _syncDirty=false;
+function saveS(fromSync){
+  if(!fromSync){S._sv=Date.now();_syncDirty=true;}
+  try{localStorage.setItem(ME_KEY,JSON.stringify(S));}catch(e){}
+}
 var CFG=(function(){try{return JSON.parse(localStorage.getItem('mayelsa_cfg'))||{};}catch(e){return{};}})();
 function saveCFG(){try{localStorage.setItem('mayelsa_cfg',JSON.stringify(CFG));}catch(e){}}
 CFG.pin=CFG.pin||'280510';
@@ -327,6 +331,12 @@ if(CFG.rate<0.7)CFG.rate=1.0; // bỏ tốc độ quá chậm cũ
 CFG.voice=CFG.voice||'Leda';
 CFG.useGemini=CFG.useGemini!==false;
 CFG.level=CFG.level||'mg'; // 'mg' = mẫu giáo 4-5 tuổi (Montessori) · 'l1' = tiền lớp 1
+/* ── Đồng bộ cài sẵn (Supabase - project Spider-Kua, bảng riêng mayelsa_sync) ──
+   Mọi thiết bị mở app là tự đồng bộ, không cần cài đặt gì.
+   (anon key là khoá công khai của Supabase, an toàn khi nằm trong web) */
+CFG.syncUrl=CFG.syncUrl||'https://fwzlxitynbpfjngiakqw.supabase.co';
+CFG.syncCode=CFG.syncCode||'MAY-ELSA-2805';
+CFG.syncAnon=CFG.syncAnon||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3emx4aXR5bmJwZmpuZ2lha3F3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MzYzNDYsImV4cCI6MjA5MTIxMjM0Nn0.uz1adH8f7ASyIgPg03d7cb6OMXaP_KFrJ7BPVi8ZHkk';
 function isMG(){return CFG.level!=='l1';}
 function maxSo(){return isMG()?10:20;}
 
@@ -1274,11 +1284,12 @@ function openQuestReward(){
     +'<div style="font-size:14px;font-weight:700;color:var(--gold2);margin-top:4px;">Bé đang có '+S.xu+' 🪙 · 🔥 '+S.streak+' ngày liền</div></div>'
     +'<div class="q-txt" style="font-size:16px;">Bé muốn làm gì với xu nè?</div>'
     +'<div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:0 auto;">'
-    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;" onclick="questTakeReward(\'save\')"><span style="font-size:30px;">🏦</span>Tích xu để dành — mua quà to hơn!</button>'
-    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canYT?'':'opacity:.45;')+'" onclick="questTakeReward(\'yt\')"><span style="font-size:30px;">▶️</span>YouTube Kids 15 phút — 40 🪙'+(canYT?'':' (thiếu '+(40-S.xu)+' xu)')+'</button>'
-    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canKeo?'':'opacity:.45;')+'" onclick="questTakeReward(\'keo\')"><span style="font-size:30px;">🍬</span>Đổi kẹo ngọt — 60 🪙'+(canKeo?'':' (thiếu '+(60-S.xu)+' xu)')+'</button>'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;" onclick="questTakeReward(\'save\')"><span style="font-size:20px;font-weight:800;color:var(--pk4);">1</span><span style="font-size:30px;">🏦</span>Tích xu để dành — mua quà to hơn!</button>'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canYT?'':'opacity:.45;')+'" onclick="questTakeReward(\'yt\')"><span style="font-size:20px;font-weight:800;color:var(--pk4);">2</span><span style="font-size:30px;">▶️</span>YouTube Kids 15 phút — 40 🪙'+(canYT?'':' (thiếu '+(40-S.xu)+' xu)')+'</button>'
+    +'<button class="opt" style="font-size:15px;justify-content:flex-start;gap:12px;padding:15px 18px;'+(canKeo?'':'opacity:.45;')+'" onclick="questTakeReward(\'keo\')"><span style="font-size:20px;font-weight:800;color:var(--pk4);">3</span><span style="font-size:30px;">🍬</span>Đổi kẹo ngọt — 60 🪙'+(canKeo?'':' (thiếu '+(60-S.xu)+' xu)')+'</button>'
     +'</div>'
     +'<div class="row-c" style="margin-top:16px;"><button class="btn-g" onclick="go(\'home\')">🏠 Về trang chủ</button></div>';
+  say('Bé chọn phần thưởng nào? Số một: tích xu để dành mua quà to. Số hai: xem YouTube Kids mười lăm phút, cần bốn mươi xu. Số ba: đổi kẹo ngọt, cần sáu mươi xu. Bé bấm số mấy nè?');
 }
 function questTakeReward(kind){
   if(kind==='save'){
@@ -1556,7 +1567,7 @@ function newSS(){
     mkOpts('ss-opts',['🌸 Bên hồng nhiều hơn','🔵 Bên xanh nhiều hơn','🤝 Bằng nhau'],correct,function(ok){
       if(ok){$('ss-mark').textContent=a>b?'🌸':a<b?'🔵':'=';$('ss-msg').textContent='🎉 Đúng rồi!';onOk('toan',a===b?'Hai bên bằng nhau, đều có '+a+' chấm.':'Bên '+(a>b?'hồng có '+a:'xanh có '+b)+' chấm, nhiều hơn.');setTimeout(newSS,1900);}
       else{$('ss-msg').textContent='💛 Bé chỉ tay đếm chấm từng bên nhé!';sayNow(retry()+' Đếm chấm hồng, rồi đếm chấm xanh, bên nào nhiều hơn nè?');}
-    },function(o){return '<span style="font-size:15px;">'+o+'</span>';});
+    },function(o){return '<span style="display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:34px;">'+o.split(' ')[0]+'</span><span style="font-size:11px;font-family:var(--ffs);">'+o.split(' ').slice(1).join(' ')+'</span></span>';});
     say('Bé đếm chấm hai bên xem: bên nào nhiều hơn, hay bằng nhau?');
   } else {
     var correct=a>b?'>':a<b?'<':'=';
@@ -1984,15 +1995,16 @@ function newPL(){
   _plCur=pick(PL_DATA);_plSel=null;_plPlaced=_plCur.items.map(function(){return false;});
   $('pl-hint').textContent=_plCur.hint;$('pl-msg').textContent='';
   renderPL();
-  say(_plCur.hint+'. Bé bấm chọn hình rồi bấm vào nhóm đúng nhé!');
+  say(_plCur.hint+'. Nhóm bên trái là '+_plCur.gsArr[0].replace(/[^\p{L}\s]/gu,'').trim()+', nhóm bên phải là '+_plCur.gsArr[1].replace(/[^\p{L}\s]/gu,'').trim()+'. Bé bấm chọn hình rồi bấm vào nhóm đúng nhé!');
 }
 function renderPL(){
   var q=_plCur;
   $('pl-items').innerHTML=q.items.map(function(it,i){
     return '<button class="opt" style="'+(_plPlaced[i]?'opacity:.3;pointer-events:none;':'')+(_plSel===i?'border-color:var(--pk4);background:var(--pk0);':'')+'" onclick="plSel('+i+')">'+it[0]+'</button>';}).join('');
   $('pl-groups').innerHTML=q.gsArr.map(function(g,gi){
+    var em=g.split(' ').pop(),tx=g.replace(em,'').trim();
     return '<div style="background:var(--ic0);border:2.5px dashed var(--ic2);border-radius:18px;padding:12px;min-height:96px;cursor:pointer;" onclick="plDrop('+gi+')">'
-      +'<div style="font-size:13px;font-weight:800;color:var(--ic5);text-align:center;margin-bottom:7px;">'+g+'</div>'
+      +'<div style="text-align:center;margin-bottom:7px;"><span style="font-size:32px;display:block;">'+em+'</span><span style="font-size:11.5px;font-weight:800;color:var(--ic5);font-family:var(--ffs);">'+tx+'</span></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;font-size:30px;">'
       +q.items.map(function(it,i){return _plPlaced[i]&&it[1]===q.key[gi]?'<span>'+it[0]+'</span>':'';}).join('')
       +'</div></div>';}).join('');
@@ -2225,7 +2237,7 @@ function newClock(){
   mkOpts('ck-opts',opts,h,function(ok){
     if(ok){$('ck-msg').textContent='🎉 Đúng! Đồng hồ chỉ '+h+' giờ đúng!';onOk('gio','Kim ngắn màu xanh chỉ số '+h+', là '+h+' giờ.');setTimeout(newClock,2000);}
     else{$('ck-msg').textContent='💛 Nhìn kim NGẮN màu xanh chỉ số mấy nhé!';sayNow(retry()+' Kim ngắn màu xanh đang chỉ số mấy?');}
-  },function(o){return o+' giờ';});
+  },function(o){return '<span style="display:flex;flex-direction:column;align-items:center;"><span>'+o+'</span><span style="font-size:11px;font-family:var(--ffs);">giờ</span></span>';});
   say('Kim phút màu hồng chỉ số 12, vậy là giờ đúng. Kim ngắn màu xanh chỉ số mấy? Đồng hồ chỉ mấy giờ?');
 }
 function docHomNay(){var d=new Date();sayNow('Hôm nay là '+THU[d.getDay()]+', ngày '+d.getDate()+' tháng '+(d.getMonth()+1)+'.');}
@@ -2681,6 +2693,85 @@ function catBuy(id){
 }
 setInterval(function(){if(S.cat.food>5)S.cat.food-=1;if(S.cat.energy<95)S.cat.energy+=1;saveS();},300000);
 
+/* ════════════════════════════════════════════════════════
+   ĐỒNG BỘ NHIỀU THIẾT BỊ
+   - Tự động: qua Firebase Realtime Database (ba mẹ tạo 1 lần, miễn phí)
+     Các máy nhập cùng địa chỉ + cùng MÃ GIA ĐÌNH → xu, học bạ, tiến độ tự chảy qua nhau
+   - Thủ công: Sao chép mã dữ liệu → dán sang máy kia (không cần cài gì)
+════════════════════════════════════════════════════════ */
+var _syncBusy=false;
+function syncIsSupa(){return /supabase\.(co|com)/.test(CFG.syncUrl||'');}
+function syncOn(){
+  if(!CFG.syncUrl||!CFG.syncCode||!navigator.onLine)return false;
+  if(syncIsSupa()&&!CFG.syncAnon)return false; // Supabase cần anon key
+  return true;
+}
+function syncRef(){return CFG.syncUrl.replace(/\/+$/,'')+'/mayelsa/'+encodeURIComponent(CFG.syncCode)+'.json';}
+function _supaBase(){return CFG.syncUrl.replace(/\/+$/,'')+'/rest/v1/mayelsa_sync';}
+function _supaHead(extra){
+  var hd={apikey:CFG.syncAnon,Authorization:'Bearer '+CFG.syncAnon,'Content-Type':'application/json'};
+  if(extra)Object.keys(extra).forEach(function(k){hd[k]=extra[k];});
+  return hd;
+}
+function _syncStatus(t){var el=$('sync-status');if(el)el.textContent=t;}
+function syncPush(manual){
+  if(!syncOn()||_syncBusy)return;
+  _syncBusy=true;if(manual)_syncStatus('⏳ Đang đẩy dữ liệu lên...');
+  var req=syncIsSupa()
+    ?fetch(_supaBase(),{method:'POST',headers:_supaHead({Prefer:'resolution=merge-duplicates'}),body:JSON.stringify([{code:CFG.syncCode,sv:S._sv||0,data:S}])})
+    :fetch(syncRef(),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sv:S._sv||0,data:S})});
+  req.then(function(r){_syncBusy=false;
+      if(r.ok){_syncDirty=false;_syncStatus('✅ Đã đồng bộ lúc '+new Date().toLocaleTimeString('vi-VN'));}
+      else _syncStatus('⚠️ Lỗi đồng bộ ('+r.status+') — kiểm tra địa chỉ / khoá / bảng');
+    },function(){_syncBusy=false;_syncStatus('⚠️ Không kết nối được máy chủ đồng bộ');});
+}
+function syncPull(manual){
+  if(!syncOn())return;
+  if(manual)_syncStatus('⏳ Đang tải dữ liệu về...');
+  var req=syncIsSupa()
+    ?fetch(_supaBase()+'?code=eq.'+encodeURIComponent(CFG.syncCode)+'&select=sv,data',{headers:_supaHead()}).then(function(r){return r.json();}).then(function(a){return (a&&a[0])||null;})
+    :fetch(syncRef()).then(function(r){return r.json();});
+  req.then(function(j){
+    if(j&&j.data&&(j.sv||0)>(S._sv||0)){
+      S=Object.assign(defState(),j.data);
+      saveS(true);updateXuUI();
+      if($('s-home').classList.contains('on'))renderQuest();
+      _syncStatus('📥 Đã nhận dữ liệu mới hơn từ thiết bị khác');
+      if(manual)sayNow('Đã tải dữ liệu của Mây về máy này rồi nhé!');
+    } else if(manual)_syncStatus(j&&j.data?'✅ Máy này đang có dữ liệu mới nhất':'ℹ️ Trên mây chưa có dữ liệu — bấm Đẩy lên ngay từ máy cũ');
+  },function(){_syncStatus('⚠️ Không kết nối được máy chủ đồng bộ');});
+}
+setInterval(function(){if(_syncDirty)syncPush();},20000);
+window.addEventListener('pagehide',function(){
+  if(!_syncDirty||!syncOn())return;
+  try{
+    if(syncIsSupa())fetch(_supaBase(),{method:'POST',keepalive:true,headers:_supaHead({Prefer:'resolution=merge-duplicates'}),body:JSON.stringify([{code:CFG.syncCode,sv:S._sv||0,data:S}])});
+    else fetch(syncRef(),{method:'PUT',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({sv:S._sv||0,data:S})});
+  }catch(e){}
+});
+function genSyncCode(){
+  CFG.syncCode='MAY-'+Math.random().toString(36).slice(2,8).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+  var el=$('st-sync-code');if(el)el.value=CFG.syncCode;
+}
+function exportData(){
+  var code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(code).catch(function(){});
+  var ta=document.createElement('textarea');ta.value=code;ta.style.cssText='position:fixed;left:-999px;';document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  ta.remove();
+  alert('Đã sao chép MÃ DỮ LIỆU vào bộ nhớ tạm.\n\nSang máy kia: mở app → ⚙️ Cài đặt → "Nhập mã dữ liệu" → dán vào là xong.');
+}
+function importData(){
+  var code=prompt('Dán MÃ DỮ LIỆU (đã sao chép từ máy cũ) vào đây:');
+  if(!code)return;
+  try{
+    var j=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(typeof j.xu!=='number')throw 0;
+    S=Object.assign(defState(),j);saveS();
+    alert('✅ Đã nhập dữ liệu của Mây thành công!');
+    location.reload();
+  }catch(e){alert('❌ Mã không hợp lệ. Kiểm tra đã sao chép đủ toàn bộ mã chưa nhé.');}
+}
 /* ── PIN ── */
 function askPin(onOk){
   $('panel-overlay').style.display='flex';
@@ -2718,6 +2809,17 @@ function openSettings(){
     +'<div class="set-lb">🐢 Tốc độ giọng máy (khi không có AI):</div>'
     +'<div class="row-c" style="justify-content:flex-start;">'+[[0.75,'🐢 Chậm'],[0.9,'🚶 Hơi chậm'],[1.0,'💬 Bình thường'],[1.12,'🏃 Nhanh']].map(function(r){
       return '<button class="btn-g" style="'+(Math.abs(CFG.rate-r[0])<0.06?'background:var(--ic4);color:#fff;border-color:var(--ic4);':'')+'" onclick="setRate('+r[0]+')">'+r[1]+'</button>';}).join('')+'</div>'
+    +'<div class="mbox" style="padding:14px;margin:12px 0 10px;background:var(--pk0);">'
+    +'<div style="font-size:13px;font-weight:800;color:var(--pk5);margin-bottom:6px;">📱 Đồng bộ nhiều thiết bị</div>'
+    +'<div style="font-size:11.5px;color:#A08CA6;font-family:var(--ffs);font-weight:600;line-height:1.5;margin-bottom:8px;">Cách nhanh (không cần cài gì): bấm <b>Sao chép mã dữ liệu</b> ở máy cũ → sang máy mới bấm <b>Nhập mã dữ liệu</b>. Cách tự động: tạo Firebase miễn phí (xem HUONG-DAN.md) rồi điền bên dưới — các máy cùng MÃ GIA ĐÌNH sẽ tự đồng bộ.</div>'
+    +'<div class="row-c" style="justify-content:flex-start;"><button class="btn-g" onclick="exportData()">📤 Sao chép mã dữ liệu</button><button class="btn-g" onclick="importData()">📥 Nhập mã dữ liệu</button></div>'
+    +'<div class="set-lb">Địa chỉ đồng bộ (Firebase hoặc Supabase):</div><input id="st-sync-url" class="set-in" placeholder="https://xxx.supabase.co hoặc https://xxx.firebasedatabase.app" value="'+esc(CFG.syncUrl||'')+'">'
+    +'<div class="set-lb">Khoá anon (chỉ cần khi dùng Supabase):</div><input id="st-sync-anon" class="set-in" placeholder="eyJhbGci..." value="'+esc(CFG.syncAnon||'')+'">'
+    +'<div class="set-lb">Mã gia đình (giống nhau trên mọi máy):</div>'
+    +'<div style="display:flex;gap:8px;"><input id="st-sync-code" class="set-in" placeholder="MAY-XXXXXX-XXXX" value="'+esc(CFG.syncCode||'')+'"><button class="btn-g" onclick="genSyncCode()">🎲 Tạo</button></div>'
+    +'<div class="row-c" style="justify-content:flex-start;"><button class="btn-g" onclick="saveSettings2();syncPush(true)">📤 Đẩy lên ngay</button><button class="btn-g" onclick="saveSettings2();syncPull(true)">📥 Tải về máy này</button></div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--ic5);font-family:var(--ffs);min-height:16px;" id="sync-status"></div>'
+    +'</div>'
     +'<div class="set-lb">🔐 Đổi mã PIN:</div>'
     +'<div style="display:flex;gap:8px;"><input id="st-pin" class="set-in" type="password" inputmode="numeric" maxlength="6" placeholder="PIN mới (4-6 số)"><button class="btn-g" onclick="changePin()">Đổi</button></div>'
     +'<div class="pin-err" id="st-msg"></div>'
@@ -2725,10 +2827,18 @@ function openSettings(){
     +'<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--pk1);text-align:center;">'
     +'<button class="btn-g" style="color:var(--bad);border-color:var(--bad1);" onclick="if(confirm(\'Xoá toàn bộ xu, huy hiệu, tiến độ của bé?\')){localStorage.removeItem(ME_KEY);location.reload();}">🗑️ Làm mới toàn bộ dữ liệu</button></div>';
 }
+function saveSettings2(){
+  var u=$('st-sync-url'),c=$('st-sync-code'),a=$('st-sync-anon');
+  if(u)CFG.syncUrl=(u.value||'').trim();
+  if(c)CFG.syncCode=(c.value||'').trim().toUpperCase();
+  if(a)CFG.syncAnon=(a.value||'').trim();
+  saveCFG();
+}
 function saveSettings(){
   CFG.apiKey=($('st-key').value||'').trim();
   CFG.voice=$('st-voice').value;
   CFG.useGemini=$('st-usegem').checked;
+  saveSettings2();
   saveCFG();
   _ttsCache={};_ttsCacheKeys=[];
   $('st-msg').textContent='';
@@ -2794,6 +2904,7 @@ function hideSplash(){
 }
 buildNav();
 makeSky();
+if(syncOn())setTimeout(function(){syncPull();},800);
 updateXuUI();
 ensureDay();
 $('sloganTxt').textContent='';
